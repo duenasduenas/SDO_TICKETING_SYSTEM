@@ -1,0 +1,7 @@
+use deped;
+CREATE TABLE deped_ticket_counters (
+  date DATE NOT NULL,
+  type VARCHAR(3) NOT NULL,
+  last_seq INT NOT NULL,
+  PRIMARY KEY (date, type)
+);
