@@ -22,7 +22,7 @@ const RequestDepedAccount = () => {
   const [schools, setSchools] = useState([]); // Store schools from the database
   const [designations, setDesignations] = useState([]); // Store designations from the database
   const [formData, setFormData] = useState({
-    requestType: "",
+    requestType: "new",
     selectedType: "",
     surname: "",
     firstName: "",
@@ -37,6 +37,7 @@ const RequestDepedAccount = () => {
     proofOfIdentity: null,
     prcID: null,
     endorsementLetter: null,
+    isDepedRA: false,
     attachmentPreviews: [],
   });
 
@@ -118,11 +119,25 @@ const RequestDepedAccount = () => {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: type === "checkbox" ? checked : value,
     }));
+
+    // Live validation for Personal Gmail field
+    if (name === "personalGmail") {
+      const lower = value.toLowerCase();
+
+      if (lower.endsWith("@deped.gov.ph")) {
+        setError(
+          "Personal Gmail must not be a DepEd email address (@deped.gov.ph)."
+        );
+      } else if (error && error.includes("Personal Gmail")) {
+        // Clear this specific error once the address is no longer a DepEd email
+        setError("");
+      }
+    }
   };
 
   const handleSchoolChange = (e) => {
@@ -203,7 +218,7 @@ const RequestDepedAccount = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setMessage("");
-  
+
     const {
       requestType,
       selectedType,
@@ -220,8 +235,15 @@ const RequestDepedAccount = () => {
       proofOfIdentity,
       prcID,
       endorsementLetter,
+      isDepedRA,
     } = formData;
-  
+
+    if (!isDepedRA) {
+      setError("You must agree and give your consent before submitting the form.");
+      setIsSubmitting(false);
+      return;
+    }
+
     if (
       !requestType ||
       !selectedType ||
@@ -239,13 +261,13 @@ const RequestDepedAccount = () => {
     let options = {
       method: "POST",
     };
-  
+
     let body = null;
-  
+
     if (requestType === "new") {
       endpoint = `${API_BASE_URL}/api/depedacc/request-deped-account`;
       body = new FormData();
-  
+
       body.append("selectedType", selectedType);
       body.append("surname", surname);
       body.append("firstName", firstName);
@@ -257,29 +279,44 @@ const RequestDepedAccount = () => {
       body.append("proofOfIdentity", proofOfIdentity);
       body.append("prcID", prcID);
       body.append("endorsementLetter", endorsementLetter);
-  
+
       options.body = body;
-  
+
+      // Disallow DepEd email in the personal Gmail field
+      if (
+        personalGmail &&
+        personalGmail.toLowerCase().endsWith("@deped.gov.ph")
+      ) {
+        setError(
+          "Personal Gmail must not be a DepEd email address (@deped.gov.ph)."
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Existing Gmail validation
       if (!isValidGmail(personalGmail)) {
-        setError("Please provide a valid Gmail address (must end with @gmail.com)");
+        setError(
+          "Please provide a valid Gmail address (must end with @gmail.com)"
+        );
         setIsSubmitting(false);
         return;
       }
     } else if (requestType === "reset") {
       // Validate DepEd email format
-      if (!deped_email.endsWith('@deped.gov.ph')) {
+      if (!deped_email.endsWith("@deped.gov.ph")) {
         setError("DepEd email must end with @deped.gov.ph");
         setIsSubmitting(false);
         return;
       }
-    
+
       // Validate required fields
       if (!employeeNumber || !personalEmail || !deped_email) {
         setError("Please provide employee number and both email addresses");
         setIsSubmitting(false);
         return;
       }
-    
+
       endpoint = `${API_BASE_URL}/api/depedacc/reset-deped-account`;
       body = JSON.stringify({
         selectedType: selectedType,
@@ -290,7 +327,7 @@ const RequestDepedAccount = () => {
         schoolID: schoolID,
         employeeNumber: employeeNumber,
         personalEmail: personalEmail,
-        deped_email: deped_email // Changed to match backend
+        deped_email: deped_email, // Changed to match backend
       });
       options.headers = {
         "Content-Type": "application/json",
@@ -298,7 +335,7 @@ const RequestDepedAccount = () => {
       };
       options.body = body;
     }
-  
+
     try {
       const response = await fetch(endpoint, options);
   
@@ -360,25 +397,6 @@ const RequestDepedAccount = () => {
           <div className="mb-4">
             <h3>DepEd Account Request</h3>
           </div>
-
-          {/* Request Type dropdown */}
-          <Form.Group as={Row} className="mb-3">
-            <Form.Label column xs={12} sm={12} md={3} lg={2}>
-              Request Type
-            </Form.Label>
-            <Col xs={12} sm={12} md={9} lg={10}>
-              <Form.Select
-                value={formData.requestType}
-                name="requestType"
-                onChange={handleRequestTypeChange}
-                required
-              >
-                <option value="">-- Select Request Type --</option>
-                <option value="new">Request New Account</option>
-                <option value="reset">Reset Existing Account</option>
-              </Form.Select>
-            </Col>
-          </Form.Group>
 
           {/* Conditional form fields based on request type */}
           {formData.requestType && (
@@ -711,6 +729,33 @@ const RequestDepedAccount = () => {
             </>
           )}
 
+          {formData.selectedType && (
+            <>
+              <p style={{ fontSize: "0.875rem", textAlign: "justify" }}>
+                I hereby authorize the Department of Education (DepEd) to collect,
+                process, store, and use my personal information provided in this
+                form for official purposes, including the creation and management
+                of my DepEd account, in accordance with Republic Act No. 10173
+                (Data Privacy Act of 2012).
+                <br />
+                <br />
+                I certify that the information I have provided is true, correct,
+                and complete. I understand that my data will be handled with
+                confidentiality and used only by authorized personnel.
+              </p>
+              <Form.Group className="mb-3">
+                <Form.Check
+                  type="checkbox"
+                  id="deped-ra-mobile"
+                  name="isDepedRA"
+                  label="I agree / I give my consent"
+                  checked={formData.isDepedRA}
+                  onChange={handleChange}
+                />
+              </Form.Group>
+            </>
+          )}
+
           <div className="d-flex justify-content-center mb-4 mt-4">
             <Button
               variant="dark"
@@ -744,25 +789,6 @@ const RequestDepedAccount = () => {
               <div className="mb-4">
                 <h3 className="fs-1">DepEd Account Request</h3>
               </div>
-
-              {/* Request Type dropdown */}
-              <Form.Group as={Row} className="mb-3">
-                <Form.Label column xs={12} sm={12} md={3} lg={2}>
-                  Request Type
-                </Form.Label>
-                <Col xs={12} sm={12} md={9} lg={10}>
-                  <Form.Select
-                    value={formData.requestType}
-                    name="requestType"
-                    onChange={handleRequestTypeChange}
-                    required
-                  >
-                    <option value="">-- Select Request Type --</option>
-                    <option value="new">Request New Account</option>
-                    <option value="reset">Reset Existing Account</option>
-                  </Form.Select>
-                </Col>
-              </Form.Group>
 
               {/* Conditional form fields based on request type */}
               {formData.requestType && (
@@ -1027,12 +1053,11 @@ const RequestDepedAccount = () => {
                           Endorsement Letter
                         </Form.Label>
                         <Col xs={12} sm={12} md={9} lg={10}>
-                          {/* Plain text link */}
+                          {/* Download link for endorsement letter template */}
                           <a
-                            href="https://docs.google.com/document/d/16FdN46utYzlT24PNWgKP82KUc2lWg3tu/edit?usp=sharing&ouid=112076861167325701159&rtpof=true&sd=true"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            href="https://docs.google.com/document/d/16FdN46utYzlT24PNWgKP82KUc2lWg3tu/export?format=docx"
                             className="d-block mb-2"
+                            download="Endorsement_Letter_Template.docx"
                           >
                             Download Endorsement Letter Template
                           </a>
@@ -1167,13 +1192,40 @@ const RequestDepedAccount = () => {
             </Card.Body>
 
             <Card.Footer
-              className="d-flex justify-content-center mb-3"
+              className="d-flex flex-column mb-3"
               style={{ backgroundColor: "transparent", border: "none" }}
             >
+              {formData.selectedType && (
+                <div className="w-100">
+                  <p style={{ fontSize: "0.875rem", textAlign: "justify" }}>
+                    I hereby authorize the Department of Education (DepEd) to
+                    collect, process, store, and use my personal information
+                    provided in this form for official purposes, including the
+                    creation and management of my DepEd account, in accordance
+                    with Republic Act No. 10173 (Data Privacy Act of 2012).
+                    <br />
+                    <br />
+                    I certify that the information I have provided is true,
+                    correct, and complete. I understand that my data will be
+                    handled with confidentiality and used only by authorized
+                    personnel.
+                  </p>
+                  <Form.Group className="mb-3">
+                    <Form.Check
+                      type="checkbox"
+                      id="deped-ra-desktop"
+                      name="isDepedRA"
+                      label="I agree / I give my consent"
+                      checked={formData.isDepedRA}
+                      onChange={handleChange}
+                    />
+                  </Form.Group>
+                </div>
+              )}
               <Button
                 variant="dark"
                 type="submit"
-                style={{ width: "25%" }}
+                style={{ width: "25%", alignSelf: "center" }}
                 disabled={isSubmitting || !formData.selectedType}
               >
                 {isSubmitting ? "Submitting..." : "Submit"}

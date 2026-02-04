@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Table, Button, Badge, Row, Col } from "react-bootstrap";
+import { FaEye, FaPaperclip, FaTrash } from "react-icons/fa";
 import axios from "axios";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../config";
@@ -9,6 +10,8 @@ const SupportTickets = ({
   loading,
   filterStatus,
   searchTerm,
+  filterMonth,
+  filterYear,
   fetchTickets,
 }) => {
   const [error, setError] = useState("");
@@ -78,6 +81,43 @@ const SupportTickets = ({
       Swal.fire({
         title: "Error",
         text: "Failed to load attachments",
+        icon: "error",
+      });
+    }
+  };
+
+  const handleArchiveTicket = async (ticket) => {
+    try {
+      const result = await Swal.fire({
+        title: "Delete Ticket",
+        text: `Are you sure you want to delete ticket ${ticket.ticketNumber}? This will archive it.`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#dc3545",
+        confirmButtonText: "Yes, delete it",
+        cancelButtonText: "Cancel",
+        reverseButtons: true,
+      });
+
+      if (!result.isConfirmed) return;
+
+      await axios.put(`${API_BASE_URL}/api/ticket/tickets/${ticket.ticketId}/archive`);
+
+      await fetchTickets();
+
+      Swal.fire({
+        title: "Deleted",
+        text: "Ticket has been deleted (archived).",
+        icon: "success",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      console.error("Error deleting ticket:", err);
+      setError("Failed to delete ticket");
+      Swal.fire({
+        title: "Error",
+        text: "Failed to delete ticket",
         icon: "error",
       });
     }
@@ -309,13 +349,34 @@ const SupportTickets = ({
       if (filterStatus === "all") return true;
       return ticket.status === filterStatus;
     })
-    .filter(
-      (ticket) =>
-        searchTerm === "" ||
-        ticket.ticketNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ticket.requestor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ticket.category.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    .filter((ticket) => {
+      if (searchTerm === "") return true;
+
+      const term = searchTerm.toLowerCase();
+      return (
+        (ticket.ticketNumber && ticket.ticketNumber.toLowerCase().includes(term)) ||
+        (ticket.requestor && ticket.requestor.toLowerCase().includes(term)) ||
+        (ticket.category && ticket.category.toLowerCase().includes(term))
+      );
+    })
+    .filter((ticket) => {
+      // Month filter based on ticket.date
+      if (!filterMonth || filterMonth === "all") return true;
+      if (!ticket.date) return false;
+
+      const createdDate = new Date(ticket.date);
+      const ticketMonth = createdDate.getMonth() + 1; // 1-12
+      return ticketMonth === Number(filterMonth);
+    })
+    .filter((ticket) => {
+      // Year filter based on ticket.date
+      if (!filterYear) return true;
+      if (!ticket.date) return false;
+
+      const createdDate = new Date(ticket.date);
+      const ticketYear = createdDate.getFullYear();
+      return ticketYear === Number(filterYear);
+    });
 
   const statusOptions = [
     "Completed",
@@ -360,10 +421,10 @@ const SupportTickets = ({
                 <tbody>
                   {filteredTickets.map((ticket) => (
                     <tr key={ticket.ticketNumber}>
-                      <td>{ticket.ticketNumber}</td>
+                      <td className="text-center">{ticket.ticketNumber}</td>
                       <td className="text-center">{ticket.requestor}</td>
                       <td className="text-center">{ticket.category}</td>
-                      <td>
+                      <td className="text-center">
                         <div
                           style={{
                             maxWidth: "250px",
@@ -383,33 +444,35 @@ const SupportTickets = ({
                           {ticket.status}
                         </Badge>
                       </td>
-                      <td>{new Date(ticket.date).toLocaleDateString()}</td>
-                      <td className="d-flex justify-content-between">
-                        <div>
+                      <td className="text-center">{new Date(ticket.date).toLocaleDateString()}</td>
+                      <td className="text-center">
+                        <div className="d-inline-flex align-items-center" style={{ gap: "6px" }}>
                           <Button
                             size="sm"
                             variant="outline-info"
-                            className="d-flex align-items-center me-2"
+                            className="d-flex align-items-center justify-content-center"
+                            style={{ width: "32px", height: "32px", padding: 0 }}
                             onClick={() => handleShowTicketDetails(ticket)}
+                            title="View details"
                           >
-                            View
+                            <FaEye size={14} />
                           </Button>
-                        </div>
-                        <div>
                           {ticket.attachments &&
                             JSON.parse(ticket.attachments).length > 0 && (
                               <Button
                                 size="sm"
                                 variant="outline-secondary"
-                                className="d-flex align-items-center"
-                                style={{ width: '65px' }}
+                                className="d-flex align-items-center justify-content-center"
+                                style={{ width: "32px", height: "32px", padding: 0 }}
                                 onClick={() =>
                                   handleOpenAttachments(ticket.attachments)
                                 }
+                                title={`View files (${JSON.parse(ticket.attachments).length})`}
                               >
-                                Files ({JSON.parse(ticket.attachments).length})
+                                <FaPaperclip size={14} />
                               </Button>
                             )}
+                          {/* Delete button removed as per request */}
                         </div>
                       </td>
                     </tr>

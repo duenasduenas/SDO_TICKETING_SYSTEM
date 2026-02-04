@@ -30,6 +30,8 @@ const AdminDashboard = () => {
   const [error, setError] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterMonth, setFilterMonth] = useState("all");
+  const [filterYear, setFilterYear] = useState("");
   const [activeTab, setActiveTab] = useState("tickets");
   const [activeMainTab, setActiveMainTab] = useState("ticketing");
   const { width } = useWindowSize();
@@ -147,6 +149,8 @@ const AdminDashboard = () => {
     setActiveTab(tab);
     setFilterStatus("all");
     setSearchTerm("");
+    setFilterMonth("all");
+    setFilterYear("");
   };
 
   const shouldShowSearchFilter =
@@ -297,6 +301,46 @@ const AdminDashboard = () => {
                 ))}
               </Form.Select>
             </div>
+            {(activeTab === "newAccounts" || activeTab === "tickets" || activeTab === "resetAccounts") && (
+              <div className="col-12 d-flex align-items-center mt-2 flex-wrap" style={{ gap: "16px" }}>
+                <div className="d-flex align-items-center mb-2" style={{ gap: "8px" }}>
+                  <span style={{ minWidth: "70px" }}>Month:</span>
+                  <Form.Select
+                    value={filterMonth}
+                    onChange={(e) => setFilterMonth(e.target.value)}
+                    style={{ minWidth: "140px" }}
+                  >
+                    <option value="all">All Months</option>
+                    <option value="1">January</option>
+                    <option value="2">February</option>
+                    <option value="3">March</option>
+                    <option value="4">April</option>
+                    <option value="5">May</option>
+                    <option value="6">June</option>
+                    <option value="7">July</option>
+                    <option value="8">August</option>
+                    <option value="9">September</option>
+                    <option value="10">October</option>
+                    <option value="11">November</option>
+                    <option value="12">December</option>
+                  </Form.Select>
+                </div>
+                <div className="d-flex align-items-center mb-2" style={{ gap: "8px" }}>
+                  <span style={{ minWidth: "70px" }}>Year:</span>
+                  <Form.Select
+                    value={filterYear}
+                    onChange={(e) => setFilterYear(e.target.value)}
+                    style={{ minWidth: "120px" }}
+                  >
+                    <option value="">All Years</option>
+                    {Array.from({ length: new Date().getFullYear() - 2000 + 1 }, (_, i) => new Date().getFullYear() - i)
+                      .map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                  </Form.Select>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -308,6 +352,8 @@ const AdminDashboard = () => {
                 loading={loading}
                 filterStatus={filterStatus}
                 searchTerm={searchTerm}
+                filterMonth={filterMonth}
+                filterYear={filterYear}
                 fetchTickets={fetchTickets}
               />
             </Tab.Pane>
@@ -318,6 +364,8 @@ const AdminDashboard = () => {
                 loading={loading}
                 filterStatus={filterStatus}
                 searchTerm={searchTerm}
+                filterMonth={filterMonth}
+                filterYear={filterYear}
                 fetchNewAccountRequests={fetchNewAccountRequests}
               />
             </Tab.Pane>
@@ -328,6 +376,8 @@ const AdminDashboard = () => {
                 loading={loading}
                 filterStatus={filterStatus}
                 searchTerm={searchTerm}
+                filterMonth={filterMonth}
+                filterYear={filterYear}
                 fetchResetAccountRequests={fetchResetAccountRequests}
               />
             </Tab.Pane>

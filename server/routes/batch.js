@@ -443,5 +443,206 @@ router.get("/getbatch/:batchId/devices", (req, res) => {
     });
 });
 
+// Update batch (only batch number and send date)
+router.put("/updatebatch/:batchId", (req, res) => {
+  const batchId = req.params.batchId;
+  const { batch_number, send_date } = req.body;
+
+  // Validate required fields
+  if (!batch_number || !send_date) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  const query = `
+    UPDATE tbl_batches 
+    SET 
+      batch_number = ?,
+      send_date = ?
+    WHERE batch_id = ?
+  `;
+
+  conn.query(
+    query,
+    [batch_number, send_date, batchId],
+    (err, result) => {
+      if (err) {
+        console.error("Error updating batch:", err);
+        return res.status(500).json({ error: "Failed to update batch" });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Batch not found" });
+      }
+
+      res.status(200).json({ message: "Batch updated successfully" });
+    }
+  );
+});
+
+// Update devices in a batch
+router.put("/updatedevices/:batchId", (req, res) => {
+  const batchId = req.params.batchId;
+  const { devices } = req.body;
+
+  // Validate input
+  if (!Array.isArray(devices) || devices.length === 0) {
+    return res.status(400).json({ error: "No devices provided for update" });
+  }
+
+  // Validate each device has required fields
+  const invalidDevices = devices.filter(d => !d.batch_devices_id || !d.device_number);
+  if (invalidDevices.length > 0) {
+    return res.status(400).json({ 
+      error: "Some devices are missing required fields",
+      details: invalidDevices
+    });
+  }
+
+  // Start transaction
+  conn.beginTransaction(err => {
+    if (err) return res.status(500).json({ error: err.message });
+
+    // First verify all devices belong to the batch
+    const deviceIds = devices.map(d => d.batch_devices_id);
+    
+    // Ensure we're not sending empty values
+    const validDeviceIds = deviceIds.filter(id => id !== undefined && id !== null);
+    
+    if (validDeviceIds.length === 0) {
+      return conn.rollback(() => {
+        res.status(400).json({ error: "No valid device IDs provided" });
+      });
+    }
+
+    // Query to verify devices
+    const checkQuery = `
+      SELECT batch_devices_id FROM tbl_batch_devices 
+      WHERE batch_devices_id IN (?) AND batch_id = ?
+    `;
+
+    conn.query(checkQuery, [validDeviceIds, batchId], (checkErr, checkResults) => {
+      if (checkErr) {
+        return conn.rollback(() => {
+          res.status(500).json({ error: checkErr.message });
+        });
+      }
+
+      // Verify we found all devices
+      if (checkResults.length !== validDeviceIds.length) {
+        const foundIds = checkResults.map(r => r.batch_devices_id);
+        const missingIds = validDeviceIds.filter(id => !foundIds.includes(id));
+        
+        return conn.rollback(() => {
+          res.status(400).json({ 
+            error: "Some devices not found in batch",
+            missing: missingIds.length > 0 ? missingIds : ["No valid IDs found"]
+          });
+        });
+      }
+
+      // Process updates
+      const updatePromises = devices.map(device => {
+        return new Promise((resolve, reject) => {
+          const updateQuery = `
+            UPDATE tbl_batch_devices 
+            SET device_number = ? 
+            WHERE batch_devices_id = ? AND batch_id = ?
+          `;
+          
+          conn.query(
+            updateQuery,
+            [device.device_number, device.batch_devices_id, batchId],
+            (updateErr, result) => {
+              if (updateErr) {
+                reject(updateErr);
+              } else if (result.affectedRows === 0) {
+                reject(new Error(`No rows updated for device ${device.batch_devices_id}`));
+              } else {
+                resolve();
+              }
+            }
+          );
+        });
+      });
+
+      // Execute all updates
+      Promise.all(updatePromises)
+        .then(() => {
+          conn.commit(err => {
+            if (err) {
+              return conn.rollback(() => {
+                res.status(500).json({ error: err.message });
+              });
+            }
+            res.status(200).json({ 
+              message: "Devices updated successfully",
+              count: devices.length
+            });
+          });
+        })
+        .catch(err => {
+          conn.rollback(() => {
+            res.status(500).json({ 
+              error: err.message,
+              details: "Failed to update one or more devices"
+            });
+          });
+        });
+    });
+  });
+});
+
+// API endpoint to get devices for a specific batch
+// API endpoint with explicit field mapping and response debugging
+router.get("/getbatch/:batchId/devices", (req, res) => {
+  const batchId = req.params.batchId;
+  
+  // Validate batchId
+  if (!batchId || isNaN(parseInt(batchId))) {
+    return res.status(400).json({ error: "Invalid batch ID" });
+  }
+  
+  const query = `
+    SELECT 
+      bd.batch_devices_id,
+      bd.batch_id,
+      bd.device_type,
+      bd.device_number
+    FROM tbl_batch_devices bd
+    WHERE bd.batch_id = ?
+    ORDER BY bd.batch_devices_id
+  `;
+  
+  conn.query(query, [batchId], (err, results) => {
+    if (err) {
+      console.error("Database error:", err);
+      return res.status(500).json({ error: "Database error", details: err.message });
+    }
+    
+    // Debug - log raw results from database
+    console.log("Raw database results:", JSON.stringify(results));
+    
+    // Explicitly map each field to ensure nothing is lost in translation
+    const devices = results.map(row => {
+      const device = {
+        batch_devices_id: row.batch_devices_id,
+        batch_id: row.batch_id,
+        device_type: row.device_type,
+        device_number: row.device_number
+      };
+      
+      // Debug - log each mapped device
+      console.log("Mapped device:", device);
+      
+      return device;
+    });
+    
+    // Debug - log final response
+    console.log("Final API response:", JSON.stringify(devices));
+    
+    res.json(devices);
+  });
+});
+
 export default router;
     

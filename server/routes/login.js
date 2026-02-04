@@ -11,9 +11,10 @@ const secretKey = process.env.SECRET_KEY || "default-secret-key"; // Fallback ke
 const LoginAttempts = {}; // In-memory attempt tracker
 
 // Define allowed origins based on environment
+// const allowedOrigins = process.env.NODE_ENV === 'production'
 const allowedOrigins = process.env.NODE_ENV === 'production'
   ? ["https://ticketing.sdocabuyao.com"]
-  : ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173"];
+  : ["http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:5173", 'http://localhost:8080'];
 
 // Debug logging middleware specific to login routes
 router.use((req, res, next) => {

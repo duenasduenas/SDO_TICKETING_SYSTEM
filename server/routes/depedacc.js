@@ -10,6 +10,7 @@ const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+
 // CORS Headers
 router.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
@@ -57,16 +58,16 @@ const upload = multer({
 ]);
 
 router.use(express.json());
+console.log("depedacc loaded")
 
 // === Account Request ===
-router.post("/request-deped-account", (req, res) => {
-  upload(req, res, (err) => {
+router.post("/request-deped-account", async (req, res) => {
+  upload(req, res, async (err) => {
     if (err instanceof multer.MulterError || err) {
       console.error("Upload error:", err);
       return res.status(400).json({ error: err.message });
     }
 
-    const requestNumber = generateRequestTicketNumber();
     const {
       selectedType, surname, firstName, middleName,
       designation, school, schoolID, personalGmail,
@@ -85,29 +86,45 @@ router.post("/request-deped-account", (req, res) => {
       return res.status(400).json({ error: "All files are required" });
     }
 
-    const query = `
-      INSERT INTO deped_account_requests
-      (requestNumber, selected_type, name, surname, first_name, middle_name, designation, school, school_id, personal_gmail,
-       proof_of_identity, prc_id, endorsement_letter)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+    try {
+      // 🔥 Generate proper REQ ticket (REQ-YYYY-MM-DD-0001)
+      const requestNumber = await generateTicket("REQ");
 
-    conn.query(query, [
-      requestNumber, selectedType, fullName, surname, firstName, middleName || "",
-      designation, school, schoolID, personalGmail,
-      proofOfIdentity, prcID, endorsementLetter
-    ], (err, result) => {
-      if (err) {
-        return res.status(500).json({ error: "Failed to submit request", dbError: err.message });
-      }
-      res.json({ message: "Request submitted", requestId: result.insertId, requestNumber });
-    });
+      const query = `
+        INSERT INTO deped_account_requests
+        (requestNumber, selected_type, name, surname, first_name, middle_name, designation, school, school_id, personal_gmail,
+         proof_of_identity, prc_id, endorsement_letter)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+
+      conn.query(query, [
+        requestNumber, selectedType, fullName, surname, firstName, middleName || "",
+        designation, school, schoolID, personalGmail,
+        proofOfIdentity, prcID, endorsementLetter
+      ], (insertErr, result) => {
+        if (insertErr) {
+          console.error("Insert error:", insertErr);
+          return res.status(500).json({ error: "Failed to submit request" });
+        }
+
+        res.json({
+          message: "Request submitted successfully",
+          requestId: result.insertId,
+          requestNumber
+        });
+      });
+
+    } catch (err) {
+      console.error("Ticket generation failed:", err);
+      res.status(500).json({ error: "Failed to generate request number" });
+    }
   });
 });
 
+
 // === Reset Request ===
-router.post("/reset-deped-account", (req, res) => {
-  const resetNumber = generateResetTicketNumber();
+router.post("/reset-deped-account", async (req, res) => {
+  const resetNumber = await generateResetTicketNumber();
   const { 
     selectedType, 
     surname, 
@@ -245,13 +262,65 @@ router.put("/deped-account-reset-requests/:id/status", (req, res) => {
   });
 });
 
+// === Delete Requests ===
+router.delete("/deped-account-requests/:id", (req, res) => {
+  const { id } = req.params;
+
+  conn.query(
+    "DELETE FROM deped_account_requests WHERE id = ?",
+    [id],
+    (err, result) => {
+      if (err) {
+        console.error("Failed to delete account request:", err);
+        return res
+          .status(500)
+          .json({ error: "Failed to delete account request" });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Request not found" });
+      }
+
+      res.json({ message: "Account request deleted" });
+    }
+  );
+});
+
+router.delete("/deped-account-reset-requests/:id", (req, res) => {
+  const { id } = req.params;
+
+  conn.query(
+    "DELETE FROM deped_account_reset_requests WHERE id = ?",
+    [id],
+    (err, result) => {
+      if (err) {
+        console.error("Failed to delete reset request:", err);
+        return res
+          .status(500)
+          .json({ error: "Failed to delete reset request" });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ error: "Request not found" });
+      }
+
+      res.json({ message: "Reset request deleted" });
+    }
+  );
+});
+
 // === Check Transaction ===
 router.get("/check-transaction", (req, res) => {
   const { number } = req.query;
   if (!number) return res.status(400).json({ error: "Transaction number is required" });
 
-  const isRequest = number.startsWith("REQ-");
+  const isLegacyRequest = number.startsWith("REQ-");
   const isReset = number.startsWith("RST-");
+
+  // New request format: YYYYMMDD-XX (e.g., 20250116-01)
+  const isNewRequestFormat = /^\d{8}-\d{2}$/.test(number);
+
+  const isRequest = isLegacyRequest || isNewRequestFormat;
 
   if (!isRequest && !isReset) {
     return res.status(400).json({ error: "Invalid transaction number" });
@@ -269,20 +338,71 @@ router.get("/check-transaction", (req, res) => {
 });
 
 // === Ticket Generators ===
-function generateRequestTicketNumber() {
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const randomLetters = letters[Math.floor(Math.random() * 26)] + letters[Math.floor(Math.random() * 26)];
-  const timestampDigits = Date.now().toString().slice(-6);
-  const randomNumbers = Math.floor(10000 + Math.random() * 90000);
-  return `REQ-${randomLetters}${timestampDigits}${randomNumbers}`;
+// New format: YYYYMMDD-XX  (e.g., 20250529-01)
+// The last two digits are a random number from 01-99 so IDs
+// stay short but unlikely to collide within the same day.
+
+async function generateResetTicketNumber() {
+  // Example using a table `deped_ticket_counters`
+  const now = new Date();
+  const dateStr = now.toISOString().split("T")[0]; // "2026-02-04"
+  
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT last_seq FROM deped_ticket_counters 
+      WHERE date = ? AND type = 'RST'
+    `;
+    conn.query(query, [dateStr], (err, results) => {
+      if (err) return reject(err);
+
+      let seq = 1;
+      if (results.length) seq = results[0].last_seq + 1;
+
+      const resetNumber = `RST-${dateStr}-${String(seq).padStart(4, "0")}`;
+
+      // Update or insert the counter
+      const upsertQuery = `
+        INSERT INTO deped_ticket_counters (date, type, last_seq) 
+        VALUES (?, 'RST', ?) 
+        ON DUPLICATE KEY UPDATE last_seq = ?
+      `;
+      conn.query(upsertQuery, [dateStr, seq, seq], (upsertErr) => {
+        if (upsertErr) return reject(upsertErr);
+        resolve(resetNumber);
+      });
+    });
+  });
 }
 
-function generateResetTicketNumber() {
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const randomLetters = [...Array(3)].map(() => letters[Math.floor(Math.random() * 26)]).join("");
-  const timestampDigits = Date.now().toString().slice(-4);
-  const randomNumbers = Math.floor(100000 + Math.random() * 900000);
-  return `RST-${randomLetters}${timestampDigits}${randomNumbers}`;
+async function generateTicket(type = "REQ") {
+  const now = new Date();
+  const dateStr = now.toISOString().split("T")[0]; // "2026-02-04"
+
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT last_seq FROM deped_ticket_counters 
+      WHERE date = ? AND type = ?
+    `;
+    conn.query(query, [dateStr, type], (err, results) => {
+      if (err) return reject(err);
+
+      let seq = 1;
+      if (results.length) seq = results[0].last_seq + 1;
+
+      const requestNumber = `${type}-${dateStr}-${String(seq).padStart(4, "0")}`;
+
+      const upsertQuery = `
+        INSERT INTO deped_ticket_counters (date, type, last_seq) 
+        VALUES (?, ?, ?) 
+        ON DUPLICATE KEY UPDATE last_seq = ?
+      `;
+      conn.query(upsertQuery, [dateStr, type, seq, seq], (upsertErr) => {
+        if (upsertErr) return reject(upsertErr);
+        resolve(requestNumber);
+      });
+    });
+  });
 }
+
 
 export default router;

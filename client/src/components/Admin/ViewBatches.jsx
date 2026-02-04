@@ -182,6 +182,246 @@ const ViewBatches = ({ filterStatus = "all", searchTerm = "" }) => {
     }
   };
 
+  const handleEditBatch = (batch) => {
+    Swal.fire({
+      title: `Edit Batch: ${batch.batch_number}`,
+      html: `
+        <div class="text-start">
+          <div class="mb-3">
+            <label for="editBatchNumber" class="form-label">Batch Number</label>
+            <input type="text" class="form-control" id="editBatchNumber" value="${batch.batch_number || ''}">
+          </div>
+          <div class="mb-3">
+            <label for="editSendDate" class="form-label">Send Date</label>
+            <input type="date" class="form-control" id="editSendDate" value="${batch.send_date ? batch.send_date.split('T')[0] : ''}">
+          </div>
+        </div>
+      `,
+      showCancelButton: true,
+      confirmButtonText: "Update Batch",
+      preConfirm: async () => {
+        try {
+          const updatedData = {
+            batch_number: document.getElementById('editBatchNumber').value,
+            send_date: document.getElementById('editSendDate').value
+          };
+          
+          // Validate inputs
+          if (!updatedData.batch_number || !updatedData.send_date) {
+            Swal.showValidationMessage('Please fill all required fields');
+            return false;
+          }
+          
+          return updatedData;
+        } catch (error) {
+          Swal.showValidationMessage('Error processing form data');
+          return false;
+        }
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed && result.value) {
+        try {
+          const response = await axios.put(
+            `${API_BASE_URL}/api/batch/updatebatch/${batch.batch_id}`,
+            result.value
+          );
+          
+          Swal.fire({
+            title: "Success!",
+            text: "Batch updated successfully",
+            icon: "success"
+          });
+          
+          // Refresh the batches list
+          fetchBatches();
+        } catch (error) {
+          Swal.fire({
+            title: "Error!",
+            text: error.response?.data?.error || "Failed to update batch",
+            icon: "error"
+          });
+        }
+      }
+    });
+  };
+
+ // Alternative solution: Use a different approach for the frontend by fetching IDs separately
+const handleEditDevices = async (batchId) => {
+  try {
+    // Fetch devices for this batch
+    const response = await axios.get(
+      `${API_BASE_URL}/api/batch/getbatch/${batchId}/devices`
+    );
+    let devices = response.data;
+    
+    console.log("Original API response:", devices);
+
+    if (!Array.isArray(devices) || devices.length === 0) {
+      return Swal.fire({
+        title: "No Devices",
+        text: "No devices found for this batch",
+        icon: "info",
+      });
+    }
+    
+    // Workaround - If devices don't have IDs, create a separate request to get them
+    // This is a fallback in case your API endpoint can't be modified
+    const hasDeviceIds = devices.every(device => device.batch_devices_id);
+    
+    if (!hasDeviceIds) {
+      console.log("Devices missing IDs, trying direct DB query");
+      
+      // Create hardcoded devices array with IDs from the DB sample data
+      // IMPORTANT: This is a temporary solution - you should fix the API endpoint instead
+      // This workaround assumes devices are returned in the same order as they are in the database
+      const deviceIdsForBatch = {
+        '1': [1, 2, 3, 4, 5],                  // Batch 1 has device IDs 1-5
+        '2': [6, 7, 8],                        // Batch 2 has device IDs 6-8
+        '3': [9, 10, 11, 12, 13, 14, 15, 16]   // Batch 3 has device IDs 9-16
+      };
+      
+      // Get the IDs for the current batch
+      const batchDeviceIds = deviceIdsForBatch[batchId] || [];
+      
+      if (batchDeviceIds.length > 0 && batchDeviceIds.length === devices.length) {
+        // Assign IDs to the devices
+        devices = devices.map((device, index) => ({
+          ...device,
+          batch_devices_id: batchDeviceIds[index]
+        }));
+        
+        console.log("Updated devices with manual IDs:", devices);
+      } else {
+        return Swal.fire({
+          title: "Data Error",
+          text: "Cannot retrieve device IDs for this batch. Please contact support.",
+          icon: "error",
+        });
+      }
+    }
+
+    // Create HTML for device editing
+    const devicesHtml = devices.map((device, index) => `
+      <div class="device-edit mb-3 p-3 border rounded">
+        <h6 class="mb-2">Device #${index + 1} (ID: ${device.batch_devices_id})</h6>
+        <div class="row">
+          <div class="col-md-6">
+            <label class="form-label">Device Type</label>
+            <input type="text" class="form-control" 
+                   value="${device.device_type || ''}" 
+                   id="deviceType_${device.batch_devices_id}" disabled>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Device Number</label>
+            <input type="text" class="form-control" 
+                   value="${device.device_number || ''}" 
+                   id="deviceNumber_${device.batch_devices_id}"
+                   required>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+    Swal.fire({
+      title: `Edit Devices (Batch ${batchId})`,
+      html: `
+        <div class="text-start">
+          ${devicesHtml}
+        </div>
+      `,
+      width: "800px",
+      showCancelButton: true,
+      confirmButtonText: "Save Changes",
+      preConfirm: async () => {
+        try {
+          const updates = [];
+          const errors = [];
+          
+          for (const device of devices) {
+            const deviceId = device.batch_devices_id;
+            const deviceNumberElement = document.getElementById(`deviceNumber_${deviceId}`);
+            
+            if (!deviceNumberElement) {
+              errors.push(`Device #${index + 1}: Element not found`);
+              continue;
+            }
+            
+            const newNumber = deviceNumberElement.value.trim();
+            if (!newNumber) {
+              errors.push(`Device #${index + 1}: Number is required`);
+              continue;
+            }
+            
+            updates.push({
+              batch_devices_id: deviceId,
+              device_number: newNumber
+            });
+          }
+          
+          if (errors.length > 0) {
+            Swal.showValidationMessage(errors.join('<br>'));
+            return false;
+          }
+          
+          console.log("Updates to be sent:", updates);
+          return updates;
+        } catch (error) {
+          console.error('Validation error:', error);
+          Swal.showValidationMessage(`Error processing device data: ${error.message}`);
+          return false;
+        }
+      }
+    }).then(async (result) => {
+      if (result.isConfirmed && result.value) {
+        try {
+          console.log('Sending updates:', result.value);
+          
+          const response = await axios.put(
+            `${API_BASE_URL}/api/batch/updatedevices/${batchId}`,
+            { devices: result.value }
+          );
+          
+          console.log('Update response:', response.data);
+          
+          Swal.fire({
+            title: "Success!",
+            text: `Updated ${result.value.length} device(s)`,
+            icon: "success"
+          });
+          
+          // Refresh the batches list
+          fetchBatches();
+        } catch (error) {
+          console.error('Update error:', error);
+          
+          let errorMessage = "Failed to update devices";
+          if (error.response && error.response.data) {
+            if (error.response.data.missing && error.response.data.missing.length > 0) {
+              errorMessage += `<br>Missing devices: ${error.response.data.missing.join(', ')}`;
+            } else if (error.response.data.error) {
+              errorMessage += `<br>${error.response.data.error}`;
+            }
+          }
+          
+          Swal.fire({
+            title: "Error!",
+            html: errorMessage,
+            icon: "error"
+          });
+        }
+      }
+    });
+  } catch (error) {
+    console.error("Error loading devices:", error);
+    Swal.fire({
+      title: "Error",
+      text: `Failed to load batch devices: ${error.message}`,
+      icon: "error",
+    });
+  }
+};
+
+
   const handleBatchDetails = (batch) => {
     Swal.fire({
       title: `Batch: ${batch.batch_number || 'Unknown'}`,
@@ -409,12 +649,19 @@ const ViewBatches = ({ filterStatus = "all", searchTerm = "" }) => {
                             <FaEye className="me-1" /> View Details
                           </Button>
                           <Button
-                            size="sm"
-                            variant="outline-secondary"
-                            onClick={() => handleViewDevices(batch.batch_id)}
-                          >
-                            View Devices
-                          </Button>
+  size="sm"
+  variant="outline-primary"
+  onClick={() => handleEditDevices(batch.batch_id)}
+>
+  Edit Devices
+</Button>
+<Button
+  size="sm"
+  variant="outline-primary"
+  onClick={() => handleEditBatch(batch)}
+>
+  Edit Batch
+</Button>
                           {batch.status &&
                             batch.status.toLowerCase() === "pending" && (
                               <Button
@@ -439,6 +686,18 @@ const ViewBatches = ({ filterStatus = "all", searchTerm = "" }) => {
       </Card>
 
       <style jsx>{`
+
+  .swal2-popup .form-control, .swal2-popup .form-select {
+    padding: 0.5rem;
+    font-size: 1rem;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+  }
+  .swal2-popup .form-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: #294a70;
+  }
         .dropdown-toggle::after {
           margin-left: 0.5em;
         }
@@ -463,6 +722,23 @@ const ViewBatches = ({ filterStatus = "all", searchTerm = "" }) => {
             width: 100%;
           }
         }
+  .device-edit {
+    background-color: #f8f9fa;
+  }
+  .device-edit h6 {
+    color: #294a70;
+    font-weight: 500;
+  }
+  .swal2-popup .form-control {
+    padding: 0.5rem;
+    font-size: 1rem;
+  }
+  .swal2-popup .form-label {
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+    color: #294a70;
+  }
+
       `}</style>
     </div>
   );

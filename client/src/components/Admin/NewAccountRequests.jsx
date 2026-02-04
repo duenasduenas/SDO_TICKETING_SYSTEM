@@ -1,17 +1,40 @@
 import React, { useState } from "react";
-import { Table, Button, Badge } from "react-bootstrap";
+import { Table, Button, Badge, Modal } from "react-bootstrap";
+import { FaEye, FaPaperclip, FaTrash } from "react-icons/fa";
 import axios from "axios";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../config";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import { Bar } from "react-chartjs-2";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const NewAccountRequests = ({
   newAccountRequests,
   loading,
   filterStatus,
   searchTerm,
+  filterMonth,
+  filterYear,
   fetchNewAccountRequests,
 }) => {
   const [error, setError] = useState("");
+  const [showGraph, setShowGraph] = useState(false);
 
   const handleOpenFiles = (request) => {
     const files = {
@@ -19,7 +42,7 @@ const NewAccountRequests = ({
       prc_id: request.prc_id || "",
       proof_of_identity: request.proof_of_identity || "",
     };
-
+    
     // Filter out empty file entries
     const validFiles = Object.entries(files).filter(
       ([key, filename]) => filename
@@ -67,7 +90,6 @@ const NewAccountRequests = ({
         content: "files-swal-content",
       },
       didOpen: () => {
-        // Add event listeners to the open file buttons
         document.querySelectorAll(".open-file").forEach((button) => {
           button.addEventListener("click", () => {
             const filename = button.getAttribute("data-filename");
@@ -79,6 +101,47 @@ const NewAccountRequests = ({
         });
       },
     });
+  };
+
+  const handleDeleteNewAccountRequest = async (request) => {
+    try {
+      const result = await Swal.fire({
+        title: "Delete Request",
+        text: `Are you sure you want to delete request ${request.requestNumber}? This cannot be undone.`,
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#dc3545",
+        confirmButtonText: "Yes, delete it",
+        cancelButtonText: "Cancel",
+        reverseButtons: true,
+      });
+
+      if (!result.isConfirmed) return;
+
+      // Soft-delete: set status to 'Rejected' with a special reason
+      await axios.put(
+        `${API_BASE_URL}/api/depedacc/deped-account-requests/${request.id}/status`,
+        { status: "Rejected", email_reject_reason: "Deleted by admin" }
+      );
+
+      await fetchNewAccountRequests();
+
+      Swal.fire({
+        title: "Deleted",
+        text: "Account request has been deleted.",
+        icon: "success",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (err) {
+      console.error("Error deleting account request:", err);
+      setError("Failed to delete account request");
+      Swal.fire({
+        title: "Error",
+        text: "Failed to delete account request",
+        icon: "error",
+      });
+    }
   };
 
   const handleUpdateNewAccountStatus = async (requestId, newStatus) => {
@@ -371,61 +434,105 @@ const NewAccountRequests = ({
 
   
   const filteredNewAccountRequests = newAccountRequests
-  .filter((request) => {
-    if (filterStatus === "all") return true;
-    return request.status.toLowerCase() === filterStatus.toLowerCase();
-  })
-  .filter((request) => {
-    if (searchTerm === "") return true;
+    .filter((request) => {
+      // Hide soft-deleted records (Rejected with special reason)
+      if (
+        request.status &&
+        request.status.toLowerCase() === "rejected" &&
+        request.email_reject_reason === "Deleted by admin"
+      ) {
+        return false;
+      }
 
-    const searchTermLower = searchTerm.toLowerCase();
+      if (filterStatus === "all") return true;
+      return request.status.toLowerCase() === filterStatus.toLowerCase();
+    })
+    .filter((request) => {
+      if (searchTerm === "") return true;
 
-    // Search in request number - check if property exists and handle various formats
-    if (request.requestNumber !== undefined) {
-      const requestNumberStr = String(request.requestNumber).toLowerCase();
-      if (requestNumberStr.includes(searchTermLower)) {
+      const searchTermLower = searchTerm.toLowerCase();
+
+      // Search in request number - check if property exists and handle various formats
+      if (request.requestNumber !== undefined) {
+        const requestNumberStr = String(request.requestNumber).toLowerCase();
+        if (requestNumberStr.includes(searchTermLower)) {
+          return true;
+        }
+      }
+      
+      // Fallback to id if requestNumber is not present
+      if (request.id !== undefined) {
+        const idStr = String(request.id).toLowerCase();
+        if (idStr.includes(searchTermLower)) {
+          return true;
+        }
+      }
+
+      // Search in account type
+      if (
+        request.selected_type &&
+        request.selected_type.toLowerCase().includes(searchTermLower)
+      ) {
         return true;
       }
-    }
-    
-    // Fallback to id if requestNumber is not present
-    if (request.id !== undefined) {
-      const idStr = String(request.id).toLowerCase();
-      if (idStr.includes(searchTermLower)) {
+
+      // Search in name fields (first name, surname, middle name)
+      if (
+        (request.first_name &&
+          request.first_name.toLowerCase().includes(searchTermLower)) ||
+        (request.surname &&
+          request.surname.toLowerCase().includes(searchTermLower)) ||
+        (request.middle_name &&
+          request.middle_name.toLowerCase().includes(searchTermLower))
+      ) {
         return true;
       }
-    }
 
-    // Search in account type
-    if (
-      request.selected_type &&
-      request.selected_type.toLowerCase().includes(searchTermLower)
-    ) {
-      return true;
-    }
+      // Search in school
+      if (
+        request.school &&
+        request.school.toLowerCase().includes(searchTermLower)
+      ) {
+        return true;
+      }
 
-    // Search in name fields (first name, surname, middle name)
-    if (
-      (request.first_name &&
-        request.first_name.toLowerCase().includes(searchTermLower)) ||
-      (request.surname &&
-        request.surname.toLowerCase().includes(searchTermLower)) ||
-      (request.middle_name &&
-        request.middle_name.toLowerCase().includes(searchTermLower))
-    ) {
-      return true;
-    }
+      return false;
+    })
+    .filter((request) => {
+      // Month filter (based on created_at)
+      if (!filterMonth || filterMonth === "all") return true;
+      if (!request.created_at) return false;
 
-    // Search in school
-    if (
-      request.school &&
-      request.school.toLowerCase().includes(searchTermLower)
-    ) {
-      return true;
-    }
+      const createdDate = new Date(request.created_at);
+      const requestMonth = createdDate.getMonth() + 1; // 1-12
+      return requestMonth === Number(filterMonth);
+    })
+    .filter((request) => {
+      // Year filter (based on created_at)
+      if (!filterYear) return true;
+      if (!request.created_at) return false;
 
-    return false;
-  });
+      const createdDate = new Date(request.created_at);
+      const requestYear = createdDate.getFullYear();
+      return requestYear === Number(filterYear);
+    })
+    // Sort so that newest requests are on top
+    .sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at) : new Date(0);
+      const dateB = b.created_at ? new Date(b.created_at) : new Date(0);
+
+      // Newest first
+      if (dateB - dateA !== 0) {
+        return dateB - dateA;
+      }
+
+      // Fallback: higher id first if dates are equal or missing
+      if (a.id !== undefined && b.id !== undefined) {
+        return b.id - a.id;
+      }
+
+      return 0;
+    });
 
   const accountStatusOptions = [
     "Completed",
@@ -433,6 +540,119 @@ const NewAccountRequests = ({
     "In Progress",
     "Rejected",
   ];
+
+  // Build chart data for status over time (based on filtered requests)
+  const statusChartConfig = (() => {
+    if (!filteredNewAccountRequests || filteredNewAccountRequests.length === 0) {
+      return { data: null, options: {} };
+    }
+
+    // Sort by created_at date
+    const sorted = [...filteredNewAccountRequests].sort((a, b) => {
+      const da = new Date(a.created_at);
+      const db = new Date(b.created_at);
+      return da - db;
+    });
+
+    // Use unique date labels (formatted) in order
+    const dateLabels = [];
+    const dateKeyToIndex = new Map();
+
+    sorted.forEach((req) => {
+      if (!req.created_at) return;
+      const d = new Date(req.created_at);
+      const key = d.toISOString().split("T")[0]; // YYYY-MM-DD
+      if (!dateKeyToIndex.has(key)) {
+        dateKeyToIndex.set(key, dateLabels.length);
+        dateLabels.push(d.toLocaleDateString());
+      }
+    });
+
+    const statuses = ["Completed", "Pending", "In Progress", "Rejected"];
+    const statusColors = {
+      Completed: "#28a745",
+      Pending: "#ffc107",
+      "In Progress": "#007bff",
+      Rejected: "#dc3545",
+    };
+
+    // Initialize counts matrix
+    const countsByStatus = {};
+    statuses.forEach((status) => {
+      countsByStatus[status] = new Array(dateLabels.length).fill(0);
+    });
+
+    // Count requests per day per status
+    sorted.forEach((req) => {
+      if (!req.created_at || !req.status) return;
+      const d = new Date(req.created_at);
+      const key = d.toISOString().split("T")[0];
+      const idx = dateKeyToIndex.get(key);
+      if (idx === undefined) return;
+
+      const normalizedStatus = req.status.toLowerCase();
+      const statusKey =
+        normalizedStatus === "completed"
+          ? "Completed"
+          : normalizedStatus === "pending"
+          ? "Pending"
+          : normalizedStatus === "in progress"
+          ? "In Progress"
+          : normalizedStatus === "rejected"
+          ? "Rejected"
+          : null;
+
+      if (statusKey && countsByStatus[statusKey]) {
+        countsByStatus[statusKey][idx] += 1;
+      }
+    });
+
+    const datasets = statuses.map((status) => ({
+      label: status,
+      data: countsByStatus[status],
+      backgroundColor: statusColors[status],
+      borderColor: statusColors[status],
+      borderWidth: 1,
+    }));
+
+    return {
+      data: {
+        labels: dateLabels,
+        datasets,
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: "top",
+          },
+          title: {
+            display: true,
+            text: "New Account Requests by Status",
+          },
+        },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: "Date",
+            },
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: "Number of Requests",
+            },
+            ticks: {
+              precision: 0,
+            },
+          },
+        },
+      },
+    };
+  })();
 
   return (
     <>
@@ -450,12 +670,21 @@ const NewAccountRequests = ({
             <h5 className="mb-0" style={{ color: "#294a70" }}>
               New Account Requests
             </h5>
-            <span
-              className="badge text-light p-2"
-              style={{ backgroundColor: "#294a70" }}
-            >
-              {filteredNewAccountRequests.length} Requests
-            </span>
+            <div className="d-flex align-items-center" style={{ gap: "10px" }}>
+              <Button
+                size="sm"
+                variant="outline-primary"
+                onClick={() => setShowGraph(true)}
+              >
+                View Graph
+              </Button>
+              <span
+                className="badge text-light p-2"
+                style={{ backgroundColor: "#294a70" }}
+              >
+                {filteredNewAccountRequests.length} Requests
+              </span>
+            </div>
           </div>
 
           {filteredNewAccountRequests.length > 0 ? (
@@ -487,7 +716,7 @@ const NewAccountRequests = ({
                         {formatMiddleName(request.middle_name)}
                       </td>
                       <td className="text-center">{request.school}</td>
-                      <td>
+                      <td className="text-center">
                         <Badge
                           bg={getStatusBadgeVariant(request.status)}
                           style={{
@@ -498,46 +727,59 @@ const NewAccountRequests = ({
                           {request.status}
                         </Badge>
                       </td>
-                      <td>
+                      <td className="text-center">
                         {new Date(request.created_at).toLocaleDateString()}
                       </td>
-                      <td className="d-flex justify-content-between">
-                        <div>
+                      <td className="text-center">
+                        <div className="d-inline-flex align-items-center" style={{ gap: "6px" }}>
+                          {/* View details icon */}
                           <Button
                             size="sm"
                             variant="outline-info"
-                            className="d-flex align-items-center me-2"
+                            className="d-flex align-items-center justify-content-center"
+                            style={{ width: "32px", height: "32px", padding: 0 }}
                             onClick={() => handleShowNewRequestDetails(request)}
+                            title="View details"
                           >
-                            View
+                            <FaEye size={14} />
                           </Button>
-                        </div>
-                        <div>
-                          {(() => {
-                            // Count valid files
-                            const files = {
-                              endorsement_letter:
-                                request.endorsement_letter || "",
-                              prc_id: request.prc_id || "",
-                              proof_of_identity:
-                                request.proof_of_identity || "",
-                            };
-                            const fileCount = Object.values(files).filter(
-                              (file) => file
-                            ).length;
 
-                            return fileCount > 0 ? (
+                          {/* Files icon (only when there are files and not completed) */}
+                          {(() => {
+                            const files = {
+                              endorsement_letter: request.endorsement_letter || "",
+                              prc_id: request.prc_id || "",
+                              proof_of_identity: request.proof_of_identity || "",
+                            };
+                            const fileCount = Object.values(files).filter((file) => file).length;
+                            const isCompleted =
+                              request.status &&
+                              request.status.toLowerCase() === "completed";
+
+                            return fileCount > 0 && !isCompleted ? (
                               <Button
                                 size="sm"
                                 variant="outline-secondary"
-                                className="d-flex align-items-center"
+                                className="d-flex align-items-center justify-content-center"
+                                style={{ width: "32px", height: "32px", padding: 0 }}
                                 onClick={() => handleOpenFiles(request)}
-                                style={{ width: "65px" }}
+                                title={`View files (${fileCount})`}
                               >
-                                Files ({fileCount})
+                                <FaPaperclip size={14} />
                               </Button>
                             ) : null;
                           })()}
+
+                          <Button
+                            size="sm"
+                            variant="outline-danger"
+                            className="d-flex align-items-center justify-content-center"
+                            style={{ width: "32px", height: "32px", padding: 0 }}
+                            onClick={() => handleDeleteNewAccountRequest(request)}
+                            title="Delete request"
+                          >
+                            <FaTrash size={14} />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -556,6 +798,29 @@ const NewAccountRequests = ({
           )}
         </div>
       )}
+
+      {/* Status graph modal */}
+      <Modal
+        show={showGraph}
+        onHide={() => setShowGraph(false)}
+        size="xl"
+        centered
+      >
+        <Modal.Header closeButton>
+          <Modal.Title>Status Graph - New Account Requests</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {statusChartConfig.data ? (
+            <div style={{ height: "450px" }}>
+              <Bar data={statusChartConfig.data} options={statusChartConfig.options} />
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <p className="mb-0">No data available for the selected filters.</p>
+            </div>
+          )}
+        </Modal.Body>
+      </Modal>
 
       {/* Add CSS styles similar to the SupportTickets component */}
       <style jsx>{`

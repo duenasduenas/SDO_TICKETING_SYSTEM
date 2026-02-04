@@ -32,6 +32,7 @@ import Forbidden from "./components/Public/Forbidden";
 import NotFound from "./components/Public/NotFound";
 import Login from "./components/Public/Login";
 import RequestDepedAccount from "./components/Public/RequestDepedAccount";
+import ResetDepedAccount from "./components/Public/ResetDepedAccount";
 import CheckTransaction from "./components/Public/CheckTransaction";
 
 function App() {
@@ -180,6 +181,10 @@ function App() {
           <Route
             path="/request-deped-account"
             element={<RequestDepedAccount />}
+          />
+          <Route
+            path="/reset-deped-account"
+            element={<ResetDepedAccount />}
           />
           <Route
             path="/checktransaction"

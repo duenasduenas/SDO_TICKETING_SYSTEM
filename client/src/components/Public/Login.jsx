@@ -207,7 +207,15 @@ const Login = () => {
               to="/request-deped-account"
               className="mt-3 text-decoration-none"
             >
-              Request New DepEd Account
+              Request New DepEd Account1
+            </Link>
+          </div>
+          <div>
+            <Link
+              to="/reset-deped-account"
+              className="mt-3 text-decoration-none"
+            >
+              Reset Existing DepEd Account
             </Link>
           </div>
           <div>
