@@ -3,6 +3,7 @@ import express from "express";
 import conn from "./conn.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import authenticateToken from "../middleware/auth.js";
 
 dotenv.config();
 
@@ -51,24 +52,7 @@ const generateResetTicketNumber = () => {
     return `RST-${randomLetters}${timestampDigits}${randomNumbers}`;
 };
 
-const authenticateToken = (req, res, next) => {
-    const token = req.header("Authorization")?.split(" ")[1];
 
-    if (!token) {
-        return res.status(401).json({ message: "Access Denied. No token provided." });
-    }
-
-    jwt.verify(token, secretKey, (err, decoded) => {
-        if (err) {
-            return res.status(403).json({ message: "Invalid token." });
-        }
-
-        req.user = decoded;
-        req.user.userId = decoded.userId || decoded.id;
-
-        next();
-    });
-};
 
 router.post("/change-password", authenticateToken, async (req, res) => {
     const userId = req.user.userId;

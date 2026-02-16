@@ -32,8 +32,8 @@ const RequestDepedAccount = () => {
     schoolID: "",
     personalGmail: "",
     employeeNumber: "",
-    personalEmail: '',
-    deped_email: '', // Changed to match backend
+    personalEmail: "",
+    deped_email: "", // Changed to match backend
     proofOfIdentity: null,
     prcID: null,
     endorsementLetter: null,
@@ -50,49 +50,59 @@ const RequestDepedAccount = () => {
     const fetchSchools = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/api/depedacc/schoolList`);
-        
+
         // First check if response is OK (status 200-299)
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Server responded with ${response.status}: ${errorText}`);
+          throw new Error(
+            `Server responded with ${response.status}: ${errorText}`
+          );
         }
-    
+
         // Check content type before parsing as JSON
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          throw new Error('Response is not JSON');
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Response is not JSON");
         }
-    
+
         const data = await response.json();
         setSchools(data);
         setError("");
       } catch (err) {
         console.error("Error fetching schools:", err);
-        setError("Error fetching schools. Please check your network and server.");
+        setError(
+          "Error fetching schools. Please check your network and server."
+        );
         setSchools([]); // Fallback to empty array
       }
     };
-    
+
     const fetchDesignations = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/depedacc/designations`);
-        
+        const response = await fetch(
+          `${API_BASE_URL}/api/depedacc/designations`
+        );
+
         if (!response.ok) {
           const errorText = await response.text();
-          throw new Error(`Server responded with ${response.status}: ${errorText}`);
+          throw new Error(
+            `Server responded with ${response.status}: ${errorText}`
+          );
         }
-    
-        const contentType = response.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          throw new Error('Response is not JSON');
+
+        const contentType = response.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+          throw new Error("Response is not JSON");
         }
-    
+
         const data = await response.json();
         setDesignations(data);
         setError("");
       } catch (err) {
         console.error("Error fetching designations:", err);
-        setError("Error fetching designations. Please check your network and server.");
+        setError(
+          "Error fetching designations. Please check your network and server."
+        );
         setDesignations([]); // Fallback to empty array
       }
     };
@@ -239,7 +249,9 @@ const RequestDepedAccount = () => {
     } = formData;
 
     if (!isDepedRA) {
-      setError("You must agree and give your consent before submitting the form.");
+      setError(
+        "You must agree and give your consent before submitting the form."
+      );
       setIsSubmitting(false);
       return;
     }
@@ -256,7 +268,7 @@ const RequestDepedAccount = () => {
       setIsSubmitting(false);
       return;
     }
-  
+
     let endpoint = "";
     let options = {
       method: "POST",
@@ -338,21 +350,24 @@ const RequestDepedAccount = () => {
 
     try {
       const response = await fetch(endpoint, options);
-  
+
       if (response.ok) {
         const responseData = await response.json();
-        const requestNumber = responseData.requestNumber || responseData.resetNumber;
-  
+        const requestNumber =
+          responseData.requestNumber || responseData.resetNumber;
+
         Swal.fire({
           title: "Success!",
-          html: `${requestType === "new" ? "New Account" : "Reset Account"} request has been submitted successfully!<br><br>Request Number: <b>${requestNumber}</b><br><br>Please screenshot to check your status`,
+          html: `${
+            requestType === "new" ? "New Account" : "Reset Account"
+          } request has been submitted successfully!<br><br>Request Number: <b>${requestNumber}</b><br><br>Please screenshot to check your status`,
           icon: "success",
           confirmButtonText: "Done",
           willClose: () => {
             navigate("/");
           },
         });
-  
+
         // Reset form with personalEmail included
         // In the success handler where you reset the form
         setFormData({
@@ -376,7 +391,11 @@ const RequestDepedAccount = () => {
       } else {
         const errorText = await response.text();
         console.error("Server responded with an error:", errorText);
-        setError(`Failed to submit request: ${response.status} - ${errorText || response.statusText}`);
+        setError(
+          `Failed to submit request: ${response.status} - ${
+            errorText || response.statusText
+          }`
+        );
       }
     } catch (error) {
       console.error("Error submitting request:", error);
@@ -553,7 +572,7 @@ const RequestDepedAccount = () => {
 
                   <Form.Group as={Row} className="mb-3">
                     <Form.Label column xs={12}>
-                      Submit a photo of you with any valid ID
+                      Submit a photo of you with =
                     </Form.Label>
                     <Col xs={12}>
                       <Form.Control
@@ -732,16 +751,15 @@ const RequestDepedAccount = () => {
           {formData.selectedType && (
             <>
               <p style={{ fontSize: "0.875rem", textAlign: "justify" }}>
-                I hereby authorize the Department of Education (DepEd) to collect,
-                process, store, and use my personal information provided in this
-                form for official purposes, including the creation and management
-                of my DepEd account, in accordance with Republic Act No. 10173
-                (Data Privacy Act of 2012).
+                I hereby authorize the Department of Education (DepEd) to
+                collect, process, store, and use my personal information
+                provided in this form for official purposes, including the
+                creation and management of my DepEd account, in accordance with
+                Republic Act No. 10173 (Data Privacy Act of 2012).
                 <br />
-                <br />
-                I certify that the information I have provided is true, correct,
-                and complete. I understand that my data will be handled with
-                confidentiality and used only by authorized personnel.
+                <br />I certify that the information I have provided is true,
+                correct, and complete. I understand that my data will be handled
+                with confidentiality and used only by authorized personnel.
               </p>
               <Form.Group className="mb-3">
                 <Form.Check
@@ -943,7 +961,7 @@ const RequestDepedAccount = () => {
                         </Col>
                       </Form.Group>
 
-                      <Form.Group as={Row} className="mb-3">
+                      {/* <Form.Group as={Row} className="mb-3">
                         <Form.Label column xs={12} sm={12} md={3} lg={2}>
                           Submit a photo of yourself holding a valid ID{" "}
                         </Form.Label>
@@ -994,7 +1012,7 @@ const RequestDepedAccount = () => {
                               )
                           )}
                         </Col>
-                      </Form.Group>
+                      </Form.Group> */}
 
                       <Form.Group as={Row} className="mb-3">
                         <Form.Label column xs={12} sm={12} md={3} lg={2}>
@@ -1117,76 +1135,73 @@ const RequestDepedAccount = () => {
                   )}
 
                   {/* Fields specific to reset account request */}
-{formData.requestType === "reset" && (
-  <>
-    {/* Employee Number Field */}
-    <Form.Group as={Row} className="mb-3">
-      <Form.Label column xs={12} sm={12} md={3} lg={2}>
-        Employee Number
-      </Form.Label>
-      <Col xs={12} sm={12} md={9} lg={10}>
-        <FloatingLabel label="Employee Number">
-          <Form.Control
-            type="text"
-            name="employeeNumber"
-            value={formData.employeeNumber}
-            onChange={handleChange}
-            placeholder="Employee Number"
-            required
-          />
-        </FloatingLabel>
-      </Col>
-    </Form.Group>
+                  {formData.requestType === "reset" && (
+                    <>
+                      {/* Employee Number Field */}
+                      <Form.Group as={Row} className="mb-3">
+                        <Form.Label column xs={12} sm={12} md={3} lg={2}>
+                          Employee Number
+                        </Form.Label>
+                        <Col xs={12} sm={12} md={9} lg={10}>
+                          <FloatingLabel label="Employee Number">
+                            <Form.Control
+                              type="text"
+                              name="employeeNumber"
+                              value={formData.employeeNumber}
+                              onChange={handleChange}
+                              placeholder="Employee Number"
+                              required
+                            />
+                          </FloatingLabel>
+                        </Col>
+                      </Form.Group>
 
-    {/* Personal Email Field - Now consistent with Employee Number */}
-    <Form.Group as={Row} className="mb-3">
-      <Form.Label column xs={12} sm={12} md={3} lg={2}>
-        Personal Email
-      </Form.Label>
-      <Col xs={12} sm={12} md={9} lg={10}>
-        <FloatingLabel label="Personal Email">
-          <Form.Control
-            type="email"
-            name="personalEmail"
-            value={formData.personalEmail}
-            onChange={handleChange}
-            required
-            placeholder="Enter your personal email address"
-          />
-        </FloatingLabel>
-        <Form.Text className="text-muted">
-          This will be used to contact you about your reset request.
-        </Form.Text>
-      </Col>
-    </Form.Group>
+                      {/* Personal Email Field - Now consistent with Employee Number */}
+                      <Form.Group as={Row} className="mb-3">
+                        <Form.Label column xs={12} sm={12} md={3} lg={2}>
+                          Personal Email
+                        </Form.Label>
+                        <Col xs={12} sm={12} md={9} lg={10}>
+                          <FloatingLabel label="Personal Email">
+                            <Form.Control
+                              type="email"
+                              name="personalEmail"
+                              value={formData.personalEmail}
+                              onChange={handleChange}
+                              required
+                              placeholder="Enter your personal email address"
+                            />
+                          </FloatingLabel>
+                          <Form.Text className="text-muted">
+                            This will be used to contact you about your reset
+                            request.
+                          </Form.Text>
+                        </Col>
+                      </Form.Group>
 
-    
-    <Form.Group as={Row} className="mb-3">
-  <Form.Label column xs={12} sm={12} md={3} lg={2}>
-    DepEd Email
-  </Form.Label>
-  <Col xs={12} sm={12} md={9} lg={10}>
-    <FloatingLabel label="DepEd Email to be reset">
-      <Form.Control
-        type="email"
-        name="deped_email" // Changed to match backend
-        value={formData.deped_email}
-        onChange={handleChange}
-        required
-        placeholder="Enter your DepEd email address to be reset"
-      />
-    </FloatingLabel>
-    <Form.Text className="text-muted">
-      The DepEd email account you want to reset (must end with @deped.gov.ph)
-    </Form.Text>
-  </Col>
-</Form.Group>
-  </>
-)}
-
-
-                    
-
+                      <Form.Group as={Row} className="mb-3">
+                        <Form.Label column xs={12} sm={12} md={3} lg={2}>
+                          DepEd Email
+                        </Form.Label>
+                        <Col xs={12} sm={12} md={9} lg={10}>
+                          <FloatingLabel label="DepEd Email to be reset">
+                            <Form.Control
+                              type="email"
+                              name="deped_email" // Changed to match backend
+                              value={formData.deped_email}
+                              onChange={handleChange}
+                              required
+                              placeholder="Enter your DepEd email address to be reset"
+                            />
+                          </FloatingLabel>
+                          <Form.Text className="text-muted">
+                            The DepEd email account you want to reset (must end
+                            with @deped.gov.ph)
+                          </Form.Text>
+                        </Col>
+                      </Form.Group>
+                    </>
+                  )}
                 </>
               )}
             </Card.Body>
@@ -1204,10 +1219,9 @@ const RequestDepedAccount = () => {
                     creation and management of my DepEd account, in accordance
                     with Republic Act No. 10173 (Data Privacy Act of 2012).
                     <br />
-                    <br />
-                    I certify that the information I have provided is true,
-                    correct, and complete. I understand that my data will be
-                    handled with confidentiality and used only by authorized
+                    <br />I certify that the information I have provided is
+                    true, correct, and complete. I understand that my data will
+                    be handled with confidentiality and used only by authorized
                     personnel.
                   </p>
                   <Form.Group className="mb-3">

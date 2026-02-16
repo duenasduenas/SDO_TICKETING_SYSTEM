@@ -121,6 +121,9 @@ const ResetAccountRequests = ({
         {
           status: "Rejected",
           notes: "Deleted by admin",
+        },
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
       );
 
@@ -187,6 +190,9 @@ const ResetAccountRequests = ({
           {
             status: newStatus,
             notes: rejectionReason
+          },
+          {
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }
         );
         

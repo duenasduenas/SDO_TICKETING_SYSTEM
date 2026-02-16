@@ -3,6 +3,8 @@ import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
 import conn from "./conn.js";
+import fs from "fs";
+import authenticateToken from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -10,13 +12,12 @@ const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-
 // CORS Headers
 router.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header(
     "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept"
+    "Origin, X-Requested-With, Content-Type, Accept, Authorization"
   );
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   if (req.method === "OPTIONS") return res.sendStatus(200);
@@ -25,11 +26,16 @@ router.use((req, res, next) => {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, path.join(__dirname,'..', "deped_uploads"));
+    cb(null, path.join(__dirname, "..", "deped_uploads"));
   },
   filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    cb(null, `${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname)}`);
+    const uniqueSuffix = `${Date.now()}-${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+    cb(
+      null,
+      `${file.fieldname}-${uniqueSuffix}${path.extname(file.originalname)}`
+    );
   },
 });
 
@@ -43,7 +49,10 @@ const fileFilter = (req, file, cb) => {
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Invalid file type. Only JPG, PNG, DOCS and PDF allowed."), false);
+    cb(
+      new Error("Invalid file type. Only JPG, PNG, DOCS and PDF allowed."),
+      false
+    );
   }
 };
 
@@ -58,7 +67,7 @@ const upload = multer({
 ]);
 
 router.use(express.json());
-console.log("depedacc loaded")
+console.log("depedacc loaded");
 
 // === Account Request ===
 router.post("/request-deped-account", async (req, res) => {
@@ -69,11 +78,25 @@ router.post("/request-deped-account", async (req, res) => {
     }
 
     const {
-      selectedType, surname, firstName, middleName,
-      designation, school, schoolID, personalGmail,
+      selectedType,
+      surname,
+      firstName,
+      middleName,
+      designation,
+      school,
+      schoolID,
+      personalGmail,
     } = req.body;
 
-    if (!selectedType || !surname || !firstName || !designation || !school || !schoolID || !personalGmail) {
+    if (
+      !selectedType ||
+      !surname ||
+      !firstName ||
+      !designation ||
+      !school ||
+      !schoolID ||
+      !personalGmail
+    ) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -82,7 +105,7 @@ router.post("/request-deped-account", async (req, res) => {
     const prcID = req.files?.prcID?.[0]?.filename;
     const endorsementLetter = req.files?.endorsementLetter?.[0]?.filename;
 
-    if (!proofOfIdentity || !prcID || !endorsementLetter) {
+    if (!prcID || !endorsementLetter) {
       return res.status(400).json({ error: "All files are required" });
     }
 
@@ -97,23 +120,36 @@ router.post("/request-deped-account", async (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
-      conn.query(query, [
-        requestNumber, selectedType, fullName, surname, firstName, middleName || "",
-        designation, school, schoolID, personalGmail,
-        proofOfIdentity, prcID, endorsementLetter
-      ], (insertErr, result) => {
-        if (insertErr) {
-          console.error("Insert error:", insertErr);
-          return res.status(500).json({ error: "Failed to submit request" });
+      conn.query(
+        query,
+        [
+          requestNumber,
+          selectedType,
+          fullName,
+          surname,
+          firstName,
+          middleName || "",
+          designation,
+          school,
+          schoolID,
+          personalGmail,
+          proofOfIdentity,
+          prcID,
+          endorsementLetter,
+        ],
+        (insertErr, result) => {
+          if (insertErr) {
+            console.error("Insert error:", insertErr);
+            return res.status(500).json({ error: "Failed to submit request" });
+          }
+
+          res.json({
+            message: "Request submitted successfully",
+            requestId: result.insertId,
+            requestNumber,
+          });
         }
-
-        res.json({
-          message: "Request submitted successfully",
-          requestId: result.insertId,
-          requestNumber
-        });
-      });
-
+      );
     } catch (err) {
       console.error("Ticket generation failed:", err);
       res.status(500).json({ error: "Failed to generate request number" });
@@ -121,30 +157,40 @@ router.post("/request-deped-account", async (req, res) => {
   });
 });
 
-
 // === Reset Request ===
 router.post("/reset-deped-account", async (req, res) => {
   const resetNumber = await generateResetTicketNumber();
-  const { 
-    selectedType, 
-    surname, 
-    firstName, 
-    middleName, 
-    school, 
-    schoolID, 
+  const {
+    selectedType,
+    surname,
+    firstName,
+    middleName,
+    school,
+    schoolID,
     employeeNumber,
     personalEmail,
-    deped_email // Add this new required field
+    deped_email, // Add this new required field
   } = req.body;
 
   // Add deped_email to required fields check
-  if (!selectedType || !surname || !firstName || !school || !schoolID || !employeeNumber || !personalEmail || !deped_email) {
+  if (
+    !selectedType ||
+    !surname ||
+    !firstName ||
+    !school ||
+    !schoolID ||
+    !employeeNumber ||
+    !personalEmail ||
+    !deped_email
+  ) {
     return res.status(400).json({ error: "Missing required fields" });
   }
 
   // Validate DepEd email format
-  if (!deped_email.endsWith('@deped.gov.ph')) {
-    return res.status(400).json({ error: "DepEd email must end with @deped.gov.ph" });
+  if (!deped_email.endsWith("@deped.gov.ph")) {
+    return res
+      .status(400)
+      .json({ error: "DepEd email must end with @deped.gov.ph" });
   }
 
   const fullName = `${surname}, ${firstName} ${middleName || ""}`.trim();
@@ -156,35 +202,45 @@ router.post("/reset-deped-account", async (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-  conn.query(query, [
-    resetNumber, 
-    selectedType, 
-    fullName, 
-    surname, 
-    firstName, 
-    middleName || "", 
-    school, 
-    schoolID, 
-    employeeNumber,
-    personalEmail,
-    deped_email
-  ], (err, result) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({ error: "Failed to submit reset request", dbError: err.message });
-    }
-    res.json({ 
-      message: "Reset request submitted successfully", 
-      requestId: result.insertId, 
+  conn.query(
+    query,
+    [
       resetNumber,
-      depedEmail: deped_email // Optionally return the deped email in response
-    });
-  });
+      selectedType,
+      fullName,
+      surname,
+      firstName,
+      middleName || "",
+      school,
+      schoolID,
+      employeeNumber,
+      personalEmail,
+      deped_email,
+    ],
+    (err, result) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res
+          .status(500)
+          .json({
+            error: "Failed to submit reset request",
+            dbError: err.message,
+          });
+      }
+      res.json({
+        message: "Reset request submitted successfully",
+        requestId: result.insertId,
+        resetNumber,
+        depedEmail: deped_email, // Optionally return the deped email in response
+      });
+    }
+  );
 });
 
 // === Get Schools ===
 router.get("/schoolList", (req, res) => {
-  const query = "SELECT schoolCode, school FROM tbl_users GROUP BY schoolCode, school";
+  const query =
+    "SELECT schoolCode, school FROM tbl_users GROUP BY schoolCode, school";
   conn.query(query, (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(results);
@@ -193,7 +249,8 @@ router.get("/schoolList", (req, res) => {
 
 // Get all designations
 router.get("/designations", (req, res) => {
-  const query = "SELECT id, designation FROM designations ORDER BY designation ASC";
+  const query =
+    "SELECT id, designation FROM designations ORDER BY designation ASC";
   conn.query(query, (err, results) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(results);
@@ -202,44 +259,58 @@ router.get("/designations", (req, res) => {
 
 // === View Requests ===
 // Add explicit array check and empty array fallback
-router.get("/deped-account-requests", (req, res) => {
-  conn.query("SELECT * FROM deped_account_requests ORDER BY created_at ASC", (err, results) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({ error: "Failed to fetch account requests" });
+router.get("/deped-account-requests", authenticateToken, (req, res) => {
+  conn.query(
+    "SELECT * FROM deped_account_requests ORDER BY created_at ASC",
+    (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res
+          .status(500)
+          .json({ error: "Failed to fetch account requests" });
+      }
+      console.log("Returning requests:", results);
+      res.json(Array.isArray(results) ? results : []);
     }
-    console.log('Returning requests:', results);
-    res.json(Array.isArray(results) ? results : []);
-  });
+  );
 });
 
 // Same for reset requests
-router.get("/deped-account-reset-requests", (req, res) => {
-  conn.query("SELECT * FROM deped_account_reset_requests ORDER BY created_at ASC", (err, results) => {
-    if (err) {
-      console.error("Database error:", err);
-      return res.status(500).json({ error: "Failed to fetch reset requests" });
-    }
-    res.json(Array.isArray(results) ? results : []);
-  });
+router.get("/deped-account-reset-requests", authenticateToken, (req, res) => {
+  try {
+    conn.query(
+      "SELECT * FROM deped_account_reset_requests ORDER BY created_at ASC",
+      (err, results) => {
+        if (err) {
+          console.error("Database error:", err);
+          return res
+            .status(500)
+            .json({ error: "Failed to fetch reset requests" });
+        }
+        res.json(Array.isArray(results) ? results : []);
+      }
+    );
+  } catch (err) {
+    return res.status(500).message({ message: err.message });
+  }
 });
 
 // === Update Status ===
 router.put("/deped-account-requests/:id/status", (req, res) => {
   const { id } = req.params;
   const { status, email_reject_reason } = req.body;
-  
+
   let query = "UPDATE deped_account_requests SET status = ?";
   let params = [status];
-  
-  if (status === 'Rejected' && email_reject_reason) {
+
+  if (status === "Rejected" && email_reject_reason) {
     query += ", email_reject_reason = ?";
     params.push(email_reject_reason);
   }
-  
+
   query += " WHERE id = ?";
   params.push(id);
-  
+
   conn.query(query, params, (err) => {
     if (err) return res.status(500).json({ error: "Failed to update status" });
     res.json({ message: "Status updated" });
@@ -252,7 +323,9 @@ router.put("/deped-account-reset-requests/:id/status", (req, res) => {
 
   const query = `
     UPDATE deped_account_reset_requests
-    SET status = ?, notes = ?, completed_at = ${status === "completed" ? "CURRENT_TIMESTAMP" : "NULL"}
+    SET status = ?, notes = ?, completed_at = ${
+      status === "completed" ? "CURRENT_TIMESTAMP" : "NULL"
+    }
     WHERE id = ?
   `;
 
@@ -312,7 +385,8 @@ router.delete("/deped-account-reset-requests/:id", (req, res) => {
 // === Check Transaction ===
 router.get("/check-transaction", (req, res) => {
   const { number } = req.query;
-  if (!number) return res.status(400).json({ error: "Transaction number is required" });
+  if (!number)
+    return res.status(400).json({ error: "Transaction number is required" });
 
   const isLegacyRequest = number.startsWith("REQ-");
   const isReset = number.startsWith("RST-");
@@ -331,8 +405,10 @@ router.get("/check-transaction", (req, res) => {
     : "SELECT resetNumber AS number, name, school, status, notes FROM deped_account_reset_requests WHERE resetNumber = ?";
 
   conn.query(query, [number], (err, results) => {
-    if (err) return res.status(500).json({ error: "Failed to check transaction" });
-    if (results.length === 0) return res.status(404).json({ error: "Transaction not found" });
+    if (err)
+      return res.status(500).json({ error: "Failed to check transaction" });
+    if (results.length === 0)
+      return res.status(404).json({ error: "Transaction not found" });
     res.json(results);
   });
 });
@@ -346,7 +422,7 @@ async function generateResetTicketNumber() {
   // Example using a table `deped_ticket_counters`
   const now = new Date();
   const dateStr = now.toISOString().split("T")[0]; // "2026-02-04"
-  
+
   return new Promise((resolve, reject) => {
     const query = `
       SELECT last_seq FROM deped_ticket_counters 
@@ -389,7 +465,10 @@ async function generateTicket(type = "REQ") {
       let seq = 1;
       if (results.length) seq = results[0].last_seq + 1;
 
-      const requestNumber = `${type}-${dateStr}-${String(seq).padStart(4, "0")}`;
+      const requestNumber = `${type}-${dateStr}-${String(seq).padStart(
+        4,
+        "0"
+      )}`;
 
       const upsertQuery = `
         INSERT INTO deped_ticket_counters (date, type, last_seq) 
@@ -403,6 +482,48 @@ async function generateTicket(type = "REQ") {
     });
   });
 }
+
+// Uploads Routes for tesing - can be removed later
+
+// Add this debug endpoint AFTER your other routes
+router.get("/debug-uploads", (req, res) => {
+  const uploadsPath = path.join(__dirname, "..", "deped_uploads");
+  
+  try {
+    const files = fs.readdirSync(uploadsPath);
+    res.json({
+      uploadsPath,
+      __dirname,
+      filesCount: files.length,
+      files: files.slice(0, 10) // Show first 10 files
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err.message,
+      uploadsPath,
+      __dirname
+    });
+  }
+});
+
+// Add this route to serve uploaded files
+router.get("/:filename", (req, res) => {
+  const { filename } = req.params;
+  const filePath = path.join(__dirname, "..", "deped_uploads", filename);
+
+  // Security check: prevent directory traversal
+  if (filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
+    return res.status(400).json({ error: "Invalid filename" });
+  }
+
+  // Check if file exists
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: "File not found" });
+  }
+
+  // Send the file
+  res.sendFile(filePath);
+});
 
 
 export default router;

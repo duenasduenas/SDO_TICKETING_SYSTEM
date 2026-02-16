@@ -59,12 +59,18 @@ const AdminDashboard = () => {
   const fetchTickets = async () => {
     try {
       setLoading(true);
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setError("No authentication token found. Please log in.");
+        setTickets([]);
+        return;
+      }
       const response = await axios.get(`${API_BASE_URL}/api/ticket/tickets`, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
           'Expires': '0',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
         params: { timestamp: Date.now() }
       });
@@ -81,12 +87,18 @@ const AdminDashboard = () => {
 
   const fetchNewAccountRequests = async () => {
     try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setError("No authentication token found. Please log in.");
+        setNewAccountRequests([]);
+        return;
+      }
       const response = await axios.get(
         `${API_BASE_URL}/api/depedacc/deped-account-requests`,
         {
           headers: {
             'Cache-Control': 'no-cache',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`
+            'Authorization': `Bearer ${token}`
           },
           params: { timestamp: Date.now() }
         }
@@ -102,8 +114,21 @@ const AdminDashboard = () => {
 
   const fetchResetAccountRequests = async () => {
     try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setError("No authentication token found. Please log in.");
+        setResetAccountRequests([]);
+        return;
+      }
       const response = await axios.get(
-        `${API_BASE_URL}/api/depedacc/deped-account-reset-requests`
+        `${API_BASE_URL}/api/depedacc/deped-account-reset-requests`,
+        {
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Authorization': `Bearer ${token}`
+          },
+          params: { timestamp: Date.now() }
+        }
       );
       setResetAccountRequests(Array.isArray(response.data) ? response.data : []);
       setError("");

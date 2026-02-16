@@ -94,7 +94,7 @@ const NewAccountRequests = ({
           button.addEventListener("click", () => {
             const filename = button.getAttribute("data-filename");
             window.open(
-              `${API_BASE_URL}/deped_uploads/${filename}`,
+              `${API_BASE_URL}/api/depedacc/${filename}`,
               "_blank"
             );
           });
