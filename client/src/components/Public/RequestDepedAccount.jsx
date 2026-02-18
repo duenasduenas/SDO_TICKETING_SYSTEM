@@ -570,7 +570,7 @@ const RequestDepedAccount = () => {
                     </Col>
                   </Form.Group>
 
-                  <Form.Group as={Row} className="mb-3">
+                  {/* <Form.Group as={Row} className="mb-3">
                     <Form.Label column xs={12}>
                       Submit a photo of you with =
                     </Form.Label>
@@ -580,7 +580,7 @@ const RequestDepedAccount = () => {
                         name="proofOfIdentity"
                         onChange={handleFileChange}
                         accept=".jpg,.jpeg,.png,.pdf"
-                        required
+                        
                       />
                       {formData.attachmentPreviews.map(
                         (file, index) =>
@@ -619,7 +619,7 @@ const RequestDepedAccount = () => {
                           )
                       )}
                     </Col>
-                  </Form.Group>
+                  </Form.Group> */}
 
                   <Form.Group as={Row} className="mb-3">
                     <Form.Label column xs={12}>

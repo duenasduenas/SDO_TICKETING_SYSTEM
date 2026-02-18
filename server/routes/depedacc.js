@@ -100,13 +100,39 @@ router.post("/request-deped-account", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    // Validate schoolID as number (assuming DB column is INT)
+    if (isNaN(schoolID)) {
+      return res.status(400).json({ error: "School ID must be a number" });
+    }
+
     const fullName = `${surname}, ${firstName} ${middleName || ""}`.trim();
-    const proofOfIdentity = req.files?.proofOfIdentity?.[0]?.filename;
+    const proofOfIdentity = req.files?.proofOfIdentity?.[0]?.filename || null;
     const prcID = req.files?.prcID?.[0]?.filename;
     const endorsementLetter = req.files?.endorsementLetter?.[0]?.filename;
 
     if (!prcID || !endorsementLetter) {
-      return res.status(400).json({ error: "All files are required" });
+      return res.status(400).json({ error: "PRC ID and Endorsement Letter are required" });
+    }
+
+    // Check if the email already exists in the database
+    const existingEmail = await new Promise((resolve, reject) => {
+      conn.query(
+        'SELECT COUNT(*) as count FROM deped_account_requests WHERE personal_gmail = ?',
+        [personalGmail],
+        (err, results) => {
+          if (err) {
+            console.error("Query error:", err);
+            reject(err);
+          } else {
+            resolve(results[0].count > 0);
+          }
+        }
+      );
+    });
+
+    // If email exists, prevent creation
+    if (existingEmail) {
+      return res.status(400).json({ error: "An account request with this email already exists" });
     }
 
     try {
@@ -131,7 +157,7 @@ router.post("/request-deped-account", async (req, res) => {
           middleName || "",
           designation,
           school,
-          schoolID,
+          parseInt(schoolID, 10),  // Ensure it's an INT for DB
           personalGmail,
           proofOfIdentity,
           prcID,
@@ -139,8 +165,8 @@ router.post("/request-deped-account", async (req, res) => {
         ],
         (insertErr, result) => {
           if (insertErr) {
-            console.error("Insert error:", insertErr);
-            return res.status(500).json({ error: "Failed to submit request" });
+            console.error("Insert error details:", insertErr);  // Enhanced logging
+            return res.status(500).json({ error: `Failed to submit request: ${insertErr.message}` });  // Include error in response
           }
 
           res.json({
