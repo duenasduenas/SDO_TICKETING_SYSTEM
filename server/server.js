@@ -22,12 +22,15 @@ console.log("Static files path:", staticFilesPath);
 // Define origins based on environment
 const allowedOrigins =
   process.env.NODE_ENV === "production"
-    ? ["https://ticketing.sdocabuyao.com", "http://localhost:5173"]
+    ? [
+        "https://ticketing.sdocabuyao.com",
+        // "http://localhost:5173"
+      ]
     : [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:5175",
-        "http://127.0.0.1:5173",
+        // "http://localhost:3000",
+        // "http://localhost:5173",
+        // "http://localhost:5175",
+        // "http://127.0.0.1:5173",
         "https://ticketing.sdocabuyao.com",
       ];
 
@@ -45,7 +48,12 @@ const corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Cache-Control"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Cache-Control",
+  ],
   exposedHeaders: ["Content-Range", "X-Content-Range"],
   optionsSuccessStatus: 200,
   preflightContinue: false,
@@ -93,7 +101,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(
   "/deped_uploads",
-  express.static(path.join(__dirname, "..", "deped_uploads"))  // Go one level up
+  express.static(path.join(__dirname, "..", "deped_uploads")) // Go one level up
 );
 app.use(express.static(staticFilesPath));
 app.use("/assets", express.static(path.join(staticFilesPath, "assets")));

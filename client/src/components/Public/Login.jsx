@@ -207,7 +207,7 @@ const Login = () => {
               to="/request-deped-account"
               className="mt-3 text-decoration-none"
             >
-              Request New DepEd Account1
+              Request New DepEd Account
             </Link>
           </div>
           <div>

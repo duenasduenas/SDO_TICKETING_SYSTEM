@@ -8,6 +8,7 @@ import { Alert, Form, Tab } from "react-bootstrap";
 import SupportTickets from "./SupportTickets";
 import NewAccountRequests from "./NewAccountRequests";
 import ResetAccountRequests from "./ResetAccountRequests";
+import CreateDesignation from "./CreateDesignation";
 import BatchCreate from "./BatchCreate";
 import AdminHeader from "./AdminHeader";
 import ViewBatches from "./ViewBatches";
@@ -371,6 +372,13 @@ const AdminDashboard = () => {
 
         <Tab.Container activeKey={activeTab}>
           <Tab.Content>
+
+          <Tab.Pane eventKey="createDesignation">
+            <CreateDesignation
+              token={localStorage.getItem("token")}
+              onSuccess={() => console.log("Designation created")}
+            />
+          </Tab.Pane>
             <Tab.Pane eventKey="tickets">
               <SupportTickets
                 tickets={tickets}
