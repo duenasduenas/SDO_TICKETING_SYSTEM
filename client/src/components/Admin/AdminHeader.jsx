@@ -14,6 +14,7 @@ import { MdAddChart } from "react-icons/md";
 import { IoKeyOutline } from "react-icons/io5";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSchool } from '@fortawesome/free-solid-svg-icons';
+import { UserPlus } from "lucide-react";
 
 const AdminHeader = ({ 
   firstName, 
@@ -124,7 +125,6 @@ const AdminHeader = ({
           <h5 className="mt-2 ms-2">SDO Cabuyao</h5>
         </div>
         <div className="">
-          <FaRegUser className="m-auto mt-4 my-2" style={{fontSize: '60px'}}/>
           <p className="text-secondary text-center mt-4 fs-6">
             Admin Dashboard
           </p>
@@ -226,6 +226,20 @@ const AdminHeader = ({
           >
             <MdAddChart className="me-3 fs-5" />
             <span className="fw-medium">Manage Issue</span>
+          </button>
+
+          {/* Create Designation */}
+          <button
+            className={`nav-link text-dark d-flex align-items-center py-3 px-1 hover-effect border-0 bg-transparent w-100 text-start ${activeTab === 'createDesignation' ? 'active-nav-item' : ''}`}
+            onClick={() => {
+              setActiveTab('createDesignation');
+              setActiveMainTab('');
+              if (width < 768) setShowSidebar(false);
+            }}
+          >
+            <UserPlus size={22} />
+            <i className="bi bi-person-badge me-3 fs-5" style={{color: '#294a70'}}></i> 
+            <span className="fw-medium">Create Designation</span>
           </button>
 
           {/* Change Password */}

@@ -114,7 +114,7 @@ const ChangePassword = () => {
           <div className="row justify-content-center">
             <div className="col-md-8 col-lg-6">
               <div className="card border-0 shadow-sm rounded-3">
-                <div className="card-header bg-primary text-white py-3">
+                <div className="card-header py-2" style={{ backgroundColor: "#294a70", color: "white" }}>
                   <h3 className="card-title mb-0 text-center">Change Your Password</h3>
                 </div>
                 <div className="card-body p-4">

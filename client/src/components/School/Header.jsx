@@ -145,7 +145,6 @@ const Navbar = () => {
           <h5 className="mt-2 ms-2">SDO Cabuyao</h5>
         </div>
         <div className="">
-          <FaRegUser className="m-auto mt-4 my-2" style={{fontSize: '60px'}}/>
           <p className="text-secondary text-center mt-4 fs-6">
             Deped Ticketing System
           </p>

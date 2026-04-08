@@ -5,262 +5,222 @@ import { API_BASE_URL } from '../../config';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSchool, faCirclePlus } from '@fortawesome/free-solid-svg-icons';
 
-const AddSchool = () => {
-  const [formData, setFormData] = useState({
-    username: '',
-    password: 'password123',
-    district: '',
-    schoolCode: '',
-    school: '',
-    address: '',
-    principal: '',
-    number: '',
-    email: ''
-  });
+const INITIAL_FORM = {
+  username:   '',
+  password:   'password123',
+  district:   '',
+  schoolCode: '',
+  school:     '',
+  address:    '',
+  principal:  '',
+  number:     '',
+  email:      '',
+};
 
-  const [errors, setErrors] = useState({});
+const AddSchool = () => {
+  const [formData,     setFormData]     = useState(INITIAL_FORM);
+  const [errors,       setErrors]       = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const validateForm = () => {
     const newErrors = {};
-    const requiredFields = ['username', 'district', 'schoolCode', 'school', 'address', 'principal', 'number', 'email'];
-
-    requiredFields.forEach(field => {
-      if (!formData[field]) {
-        newErrors[field] = 'This field is required';
-      }
-    });
-
-    if (formData.district && !/^\d+$/.test(formData.district)) {
+    ['username', 'district', 'schoolCode', 'school', 'address', 'principal', 'number', 'email']
+      .forEach(f => { if (!formData[f]) newErrors[f] = 'This field is required'; });
+    if (formData.district && !/^\d+$/.test(formData.district))
       newErrors.district = 'District must be a number';
-    }
-
-    if (formData.number && !/^\d{10,11}$/.test(formData.number)) {
-      newErrors.number = 'Invalid phone number format';
-    }
-
-    if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
+    if (formData.number && !/^\d{10,11}$/.test(formData.number))
+      newErrors.number = 'Must be 10–11 digits';
+    if (formData.email && !/\S+@\S+\.\S+/.test(formData.email))
       newErrors.email = 'Invalid email format';
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    // Only allow numbers for district field
-    if (name === 'district' && value !== '' && !/^\d+$/.test(value)) {
-      return;
-    }
-    
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    if (name === 'district' && value !== '' && !/^\d+$/.test(value)) return;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: undefined }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
-
     setIsSubmitting(true);
-
     try {
       const token = localStorage.getItem('token');
-      await axios.post(`${API_BASE_URL}/api/reset/addschools`, {
-        ...formData,
-        role: 'Staff'
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      Swal.fire({
-        title: 'Success!',
-        text: 'School added successfully',
-        icon: 'success',
-        confirmButtonColor: '#294a70'
-      });
-
-      // Reset form
-      setFormData({
-        username: '',
-        password: 'password123',
-        district: '',
-        schoolCode: '',
-        school: '',
-        address: '',
-        principal: '',
-        number: '',
-        email: ''
-      });
+      await axios.post(
+        `${API_BASE_URL}/api/reset/addschools`,
+        { ...formData, role: 'Staff' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      Swal.fire({ title: 'Success!', text: 'School added successfully', icon: 'success', timer: 2000, showConfirmButton: false });
+      setFormData(INITIAL_FORM);
+      setErrors({});
     } catch (err) {
-      Swal.fire({
-        title: 'Error!',
-        text: err.response?.data?.message || 'Failed to add school',
-        icon: 'error',
-        confirmButtonColor: '#294a70'
-      });
+      Swal.fire({ title: 'Error!', text: err.response?.data?.message || 'Failed to add school', icon: 'error' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  /* ── Reusable sub-components ── */
+  const Field = ({ id, label, error, full, children }) => (
+    <div style={{ gridColumn: full ? '1 / -1' : undefined, display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <label htmlFor={id} style={{
+        fontSize: '0.72rem', fontWeight: 600, color: '#7a8fa6',
+        textTransform: 'uppercase', letterSpacing: '0.04em',
+      }}>
+        {label}
+      </label>
+      {children}
+      {error && <span style={{ fontSize: '0.75rem', color: '#dc3545' }}>{error}</span>}
+    </div>
+  );
+
+  const inp = (hasError) => ({
+    width: '100%', boxSizing: 'border-box',
+    height: 38, border: `1.5px solid ${hasError ? '#dc3545' : '#d0dbe8'}`,
+    borderRadius: 7, padding: '0 12px',
+    fontSize: '0.83rem', color: '#2c3e50', background: '#fff',
+    outline: 'none', fontFamily: "'Segoe UI', system-ui, sans-serif",
+    transition: 'border-color .15s, box-shadow .15s',
+  });
+
   return (
-    <div className="container py-5">
-      <div className="row justify-content-center">
-        <div className="col-md-10 col-lg-8">
-          <div className="card border-0 shadow-sm rounded-3">
-            <div className="card-header bg-primary text-white py-3">
-              <h3 className="card-title mb-0 text-center">
-                <FontAwesomeIcon icon={faSchool} className="me-2" />
-                Add New School
-              </h3>
-            </div>
-            <div className="card-body p-4">
-              <form onSubmit={handleSubmit} className="needs-validation" noValidate>
-                <div className="row g-3">
-                  {/* Username */}
-                  <div className="col-md-6">
-                    <label htmlFor="username" className="form-label fw-bold">Username</label>
-                    <input
-                      type="text"
-                      className={`form-control ${errors.username ? 'is-invalid' : ''}`}
-                      id="username"
-                      name="username"
-                      value={formData.username}
-                      onChange={handleChange}
-                      required
-                    />
-                    {errors.username && <div className="invalid-feedback">{errors.username}</div>}
-                  </div>
+    <>
+      <style>{`
+        .as-inp:focus, .as-ta:focus {
+          border-color: #294a70 !important;
+          box-shadow: 0 0 0 3px rgba(41,74,112,0.08);
+        }
+        .as-btn:hover:not(:disabled) {
+          background: #243f60 !important;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(26,46,74,0.2);
+        }
+        .as-spin {
+          display: inline-block;
+          width: 14px; height: 14px;
+          border: 2px solid rgba(255,255,255,0.3);
+          border-top-color: #fff;
+          border-radius: 50%;
+          animation: asSpin .7s linear infinite;
+          vertical-align: middle;
+        }
+        @keyframes asSpin { to { transform: rotate(360deg); } }
+      `}</style>
 
-                  {/* District */}
-                  <div className="col-md-6">
-                    <label htmlFor="district" className="form-label fw-bold">District Number</label>
-                    <input
-                      type="text"
-                      className={`form-control ${errors.district ? 'is-invalid' : ''}`}
-                      id="district"
-                      name="district"
-                      value={formData.district}
-                      onChange={handleChange}
-                      required
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                    />
-                    {errors.district && <div className="invalid-feedback">{errors.district}</div>}
-                  </div>
+      <div style={{ fontFamily: "'Segoe UI', system-ui, sans-serif", maxWidth: 720, margin: '0 auto' }}>
 
-                  {/* School Code */}
-                  <div className="col-md-6">
-                    <label htmlFor="schoolCode" className="form-label fw-bold">School Code</label>
-                    <input
-                      type="text"
-                      className={`form-control ${errors.schoolCode ? 'is-invalid' : ''}`}
-                      id="schoolCode"
-                      name="schoolCode"
-                      value={formData.schoolCode}
-                      onChange={handleChange}
-                      required
-                    />
-                    {errors.schoolCode && <div className="invalid-feedback">{errors.schoolCode}</div>}
-                  </div>
+        {/* Page header */}
+        <h5 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#1a2e4a', margin: '0 0 4px' }}>
+          Add New School
+        </h5>
+        <p style={{ fontSize: '0.82rem', color: '#7a8fa6', margin: '0 0 20px' }}>
+          Fill in the details below to register a new school account.
+        </p>
 
-                  {/* School Name */}
-                  <div className="col-12">
-                    <label htmlFor="school" className="form-label fw-bold">School Name</label>
-                    <input
-                      type="text"
-                      className={`form-control ${errors.school ? 'is-invalid' : ''}`}
-                      id="school"
-                      name="school"
-                      value={formData.school}
-                      onChange={handleChange}
-                      required
-                    />
-                    {errors.school && <div className="invalid-feedback">{errors.school}</div>}
-                  </div>
+        {/* Card */}
+        <div style={{ background: '#fff', border: '1px solid #e4ecf4', borderRadius: 10, overflow: 'hidden' }}>
 
-                  {/* Address */}
-                  <div className="col-12">
-                    <label htmlFor="address" className="form-label fw-bold">Address</label>
-                    <textarea
-                      className={`form-control ${errors.address ? 'is-invalid' : ''}`}
-                      id="address"
-                      name="address"
-                      value={formData.address}
-                      onChange={handleChange}
-                      rows="3"
-                      required
-                    ></textarea>
-                    {errors.address && <div className="invalid-feedback">{errors.address}</div>}
-                  </div>
-
-                  {/* Principal */}
-                  <div className="col-md-6">
-                    <label htmlFor="principal" className="form-label fw-bold">Principal</label>
-                    <input
-                      type="text"
-                      className={`form-control ${errors.principal ? 'is-invalid' : ''}`}
-                      id="principal"
-                      name="principal"
-                      value={formData.principal}
-                      onChange={handleChange}
-                      required
-                    />
-                    {errors.principal && <div className="invalid-feedback">{errors.principal}</div>}
-                  </div>
-
-                  {/* Contact Number */}
-                  <div className="col-md-6">
-                    <label htmlFor="number" className="form-label fw-bold">Contact Number</label>
-                    <input
-                      type="tel"
-                      className={`form-control ${errors.number ? 'is-invalid' : ''}`}
-                      id="number"
-                      name="number"
-                      value={formData.number}
-                      onChange={handleChange}
-                      required
-                    />
-                    {errors.number && <div className="invalid-feedback">{errors.number}</div>}
-                  </div>
-
-                  {/* Email */}
-                  <div className="col-12">
-                    <label htmlFor="email" className="form-label fw-bold">Email</label>
-                    <input
-                      type="email"
-                      className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                      id="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      required
-                    />
-                    {errors.email && <div className="invalid-feedback">{errors.email}</div>}
-                  </div>
-                </div>
-
-                <div className="d-grid gap-2 mt-4">
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary py-2"
-                    disabled={isSubmitting}
-                    style={{ backgroundColor: "#294a70", border: "none" }}
-                  >
-                    <FontAwesomeIcon icon={faCirclePlus} className="me-2" />
-                    {isSubmitting ? 'Adding School...' : 'Add School'}
-                  </button>
-                </div>
-              </form>
-            </div>
+          {/* Card header */}
+          <div style={{
+            background: '#1a2e4a', padding: '13px 20px',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <FontAwesomeIcon icon={faSchool} style={{ color: 'rgba(255,255,255,0.65)', fontSize: 14 }} />
+            <span style={{ color: '#fff', fontWeight: 600, fontSize: '0.88rem' }}>School Information</span>
           </div>
+
+          {/* Form body */}
+          <form onSubmit={handleSubmit} noValidate style={{ padding: '24px 24px 28px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '18px 20px' }}>
+
+              <Field id="username" label="Username" error={errors.username}>
+                <input className="as-inp" id="username" name="username" type="text"
+                  value={formData.username} onChange={handleChange}
+                  style={inp(errors.username)} placeholder="e.g. school_username" />
+              </Field>
+
+              <Field id="district" label="District Number" error={errors.district}>
+                <input className="as-inp" id="district" name="district" type="text"
+                  inputMode="numeric" pattern="[0-9]*"
+                  value={formData.district} onChange={handleChange}
+                  style={inp(errors.district)} placeholder="e.g. 1" />
+              </Field>
+
+              <Field id="schoolCode" label="School Code" error={errors.schoolCode}>
+                <input className="as-inp" id="schoolCode" name="schoolCode" type="text"
+                  value={formData.schoolCode} onChange={handleChange}
+                  style={inp(errors.schoolCode)} placeholder="e.g. 123456" />
+              </Field>
+
+              <Field id="principal" label="Principal" error={errors.principal}>
+                <input className="as-inp" id="principal" name="principal" type="text"
+                  value={formData.principal} onChange={handleChange}
+                  style={inp(errors.principal)} placeholder="Full name" />
+              </Field>
+
+              <Field id="school" label="School Name" error={errors.school} full>
+                <input className="as-inp" id="school" name="school" type="text"
+                  value={formData.school} onChange={handleChange}
+                  style={inp(errors.school)} placeholder="Complete school name" />
+              </Field>
+
+              <Field id="address" label="Address" error={errors.address} full>
+                <textarea className="as-ta" id="address" name="address"
+                  value={formData.address} onChange={handleChange} rows={3}
+                  style={{
+                    ...inp(errors.address), height: 'auto', minHeight: 80,
+                    padding: '8px 12px', resize: 'vertical',
+                  }}
+                  placeholder="Complete school address" />
+              </Field>
+
+              <Field id="number" label="Contact Number" error={errors.number}>
+                <input className="as-inp" id="number" name="number" type="tel"
+                  value={formData.number} onChange={handleChange}
+                  style={inp(errors.number)} placeholder="10–11 digit number" />
+              </Field>
+
+              <Field id="email" label="Email" error={errors.email}>
+                <input className="as-inp" id="email" name="email" type="email"
+                  value={formData.email} onChange={handleChange}
+                  style={inp(errors.email)} placeholder="school@example.com" />
+              </Field>
+
+            </div>
+
+            {/* Divider */}
+            <div style={{ borderTop: '1px solid #f0f4f9', margin: '24px 0 20px' }} />
+
+            {/* Submit */}
+            <button
+              type="submit"
+              className="as-btn"
+              disabled={isSubmitting}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                width: '100%', height: 42, background: '#1a2e4a', color: '#fff',
+                border: 'none', borderRadius: 8,
+                fontSize: '0.88rem', fontWeight: 600,
+                cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                opacity: isSubmitting ? 0.7 : 1,
+                transition: 'background .2s, transform .15s, box-shadow .2s',
+                fontFamily: "'Segoe UI', system-ui, sans-serif",
+              }}
+            >
+              {isSubmitting ? (
+                <><span className="as-spin" style={{ marginRight: 6 }} />Adding School…</>
+              ) : (
+                <><FontAwesomeIcon icon={faCirclePlus} style={{ fontSize: 13 }} />Add School</>
+              )}
+            </button>
+          </form>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

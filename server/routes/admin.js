@@ -32,5 +32,37 @@ router.post("/create-designation", authenticateToken, (req, res) => {
   });
 });
 
+router.get("/designations", authenticateToken, (req, res) => {
+  const query = "SELECT * FROM designations ORDER BY designation ASC";
+  conn.query(query, (err, results) => {
+    if (err) {
+      console.error("Error fetching designations:", err);
+      res.status(500).json({ error: "Failed to fetch designations" });
+    } else {
+      res.status(200).json(results);
+    }
+  });
+});
+
+// Edit designation
+router.put("/designation/:id", authenticateToken, (req, res) => {
+  const { designation } = req.body;
+  const { id } = req.params;
+  if (!designation) return res.status(400).json({ error: "Designation is required" });
+  conn.query("UPDATE designations SET designation = ? WHERE id = ?", [designation, id], (err) => {
+    if (err) return res.status(500).json({ error: "Failed to update designation" });
+    res.json({ message: "Designation updated successfully" });
+  });
+});
+
+// Delete designation
+router.delete("/designation/:id", authenticateToken, (req, res) => {
+  const { id } = req.params;
+  conn.query("DELETE FROM designations WHERE id = ?", [id], (err) => {
+    if (err) return res.status(500).json({ error: "Failed to delete designation" });
+    res.json({ message: "Designation deleted successfully" });
+  });
+});
+
 // Export the router
 export default router;

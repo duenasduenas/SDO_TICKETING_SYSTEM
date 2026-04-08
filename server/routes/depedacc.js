@@ -286,39 +286,136 @@ router.get("/designations", (req, res) => {
 // === View Requests ===
 // Add explicit array check and empty array fallback
 router.get("/deped-account-requests", authenticateToken, (req, res) => {
-  conn.query(
-    "SELECT * FROM deped_account_requests ORDER BY created_at ASC",
-    (err, results) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const offset = (page - 1) * limit;
+  const status = req.query.status || null;
+  const search = req.query.search || '';
+
+  let query = `
+    SELECT *, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as formatted_date
+    FROM deped_account_requests 
+    WHERE 1=1
+  `;
+  let countQuery = 'SELECT COUNT(*) as total FROM deped_account_requests WHERE 1=1';
+  let params = [];
+  let countParams = [];
+
+  if (status) {
+    query += ' AND status = ?';
+    countQuery += ' AND status = ?';
+    params.push(status);
+    countParams.push(status);
+  }
+
+  if (search) {
+    query += ' AND (requestNumber LIKE ? OR name LIKE ? OR school LIKE ? OR personal_gmail LIKE ?)';
+    countQuery += ' AND (requestNumber LIKE ? OR name LIKE ? OR school LIKE ? OR personal_gmail LIKE ?)';
+    const searchTerm = `%${search}%`;
+    params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    countParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
+  }
+
+  query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+
+  // Get total count first
+  conn.query(countQuery, countParams, (countErr, countResults) => {
+    if (countErr) {
+      console.error("Count query error:", countErr);
+      return res.status(500).json({ error: "Failed to count requests" });
+    }
+
+    const total = countResults[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    // Get paginated data
+    conn.query(query, params, (err, results) => {
       if (err) {
         console.error("Database error:", err);
-        return res
-          .status(500)
-          .json({ error: "Failed to fetch account requests" });
+        return res.status(500).json({ error: "Failed to fetch account requests" });
       }
-      console.log("Returning requests:", results);
-      res.json(Array.isArray(results) ? results : []);
-    }
-  );
+      
+      res.json({
+        data: Array.isArray(results) ? results : [],
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1
+        }
+      });
+    });
+  });
 });
 
 // Same for reset requests
 router.get("/deped-account-reset-requests", authenticateToken, (req, res) => {
-  try {
-    conn.query(
-      "SELECT * FROM deped_account_reset_requests ORDER BY created_at ASC",
-      (err, results) => {
-        if (err) {
-          console.error("Database error:", err);
-          return res
-            .status(500)
-            .json({ error: "Failed to fetch reset requests" });
-        }
-        res.json(Array.isArray(results) ? results : []);
-      }
-    );
-  } catch (err) {
-    return res.status(500).message({ message: err.message });
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const offset = (page - 1) * limit;
+  const status = req.query.status || null;
+  const search = req.query.search || '';
+
+  let query = `
+    SELECT *, DATE_FORMAT(created_at, '%Y-%m-%d %H:%i:%s') as formatted_date
+    FROM deped_account_reset_requests 
+    WHERE 1=1
+  `;
+  let countQuery = 'SELECT COUNT(*) as total FROM deped_account_reset_requests WHERE 1=1';
+  let params = [];
+  let countParams = [];
+
+  if (status) {
+    query += ' AND status = ?';
+    countQuery += ' AND status = ?';
+    params.push(status);
+    countParams.push(status);
   }
+
+  if (search) {
+    query += ' AND (resetNumber LIKE ? OR name LIKE ? OR school LIKE ? OR deped_email LIKE ?)';
+    countQuery += ' AND (resetNumber LIKE ? OR name LIKE ? OR school LIKE ? OR deped_email LIKE ?)';
+    const searchTerm = `%${search}%`;
+    params.push(searchTerm, searchTerm, searchTerm, searchTerm);
+    countParams.push(searchTerm, searchTerm, searchTerm, searchTerm);
+  }
+
+  query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+
+  // Get total count first
+  conn.query(countQuery, countParams, (countErr, countResults) => {
+    if (countErr) {
+      console.error("Count query error:", countErr);
+      return res.status(500).json({ error: "Failed to count reset requests" });
+    }
+
+    const total = countResults[0].total;
+    const totalPages = Math.ceil(total / limit);
+
+    // Get paginated data
+    conn.query(query, params, (err, results) => {
+      if (err) {
+        console.error("Database error:", err);
+        return res.status(500).json({ error: "Failed to fetch reset requests" });
+      }
+      
+      res.json({
+        data: Array.isArray(results) ? results : [],
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNext: page < totalPages,
+          hasPrev: page > 1
+        }
+      });
+    });
+  });
 });
 
 // === Update Status ===
